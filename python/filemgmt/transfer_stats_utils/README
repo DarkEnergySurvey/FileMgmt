@@ -1,0 +1,59 @@
+This directory has some scripts to summarize the
+statistics produced by the instrumented http_utils.py
+in the parent directory. The specific line in http_utils.py
+that produces the output is currently
+
+
+     fwdebug(3, "HTTP_UTILS_DEBUG", "Copy info: %d %s %d %s %s %s" % (HttpUtils.copyfiles_called,
+                                                                      fdict['filename'],
+                                                                      fdict['filesize'],
+                                                                      copy_time,
+                                                                      time.time(),
+                                                                      'toarchive' if isurl_dst else 'fromarchive'))
+
+This goes in the stdout of the runs which condor brings
+back. HTTP_UTILS_DEBUG has to be set in the environment
+for this to work with something like
+   export HTTP_UTILS_DEBUG=3
+
+
+Example command line and output:
+
+   $ ./compute_all_stats.sh ms4_finalcut_xxxx_fringe_20140225101835
+   num_jobs total_CPU_time(s) total_CPU_time(h) wall_time(s) wall_time(h)
+   num_jobs total_CPU_time(s) total_CPU_time(h) wall_time(s) wall_time(h)  num_copies num_files num_bytes_from num_bytes_to time_used(s)  directory
+   188 26381 7.32805555556 1806 0.501666666667  23 3382 34981485478 31062469654 3838.96485257    ms4_finalcut_xxxx_fringe_20140225101835
+
+   times_copied   total_bytes_copied  num_files
+    1  40842694017  1713
+    2  6245062220  124
+    3  15639652800  124
+    123  10824  1
+    124  271188  1
+    61  618845  4
+    62  3315645238  9
+
+Here is a description of some of the fields:
+
+   num_jobs         is the total # of jobs run to process this exposure
+   total CPU time   the total time summed over all the jobs that this pipeline needed
+   wall time        is how long the user has to wait to get all the processed data back for that exposure which is less than CPU time since jobs run in parallel
+   num copies       the # of batches of copies needed to process the exposure, including copies both to and from the job 
+   num_files        the total number of files in these batches of copies
+   num_bytes_from   the number of bytes that need to be transferred from the archive to the job
+   num_bytes_to     the number of bytes that need to be transferred from the job to the archive
+   time_used        is the total amount of time that all the copies took, summed over all the worker nodes
+
+The second table tries to record how many repeated
+copies there are. Each row corresponds to a set of
+files that were copied TIMES_COPIED times. The total
+amount of bytes transferred to move these files is
+TOTAL_BYTES_COPIED. TOTAL_BYTES_COPIED already includes
+the effect of the repeated copies, so the sum of this
+column should equal the sum of NUM_BYTES_TO and
+NUM_BYTES_FROM in the first table.
+
+compute_all_stats.sh is somewhat crude. For one thing,
+the name of the exposure is hard wired into it. Running
+compute_copy_stats.py and compute_job_length.py by
+themselves is also possible.
