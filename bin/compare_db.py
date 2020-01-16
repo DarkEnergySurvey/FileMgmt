@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ Compare files between disk and DB, based on relative path, reqnum, unitname, attnum, and/or
     pfw_attempt_id
@@ -8,7 +8,7 @@ import sys
 import argparse
 import filemgmt.compare_utils as compare
 
-class Print(object):
+class Print:
     """ Class to capture printed output and write it to a log file
 
         Parameters

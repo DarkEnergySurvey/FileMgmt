@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # $Id: transfer_stats_db.py 48550 2019-05-20 19:28:17Z friedel $
 # $Rev:: 48550                            $:  # Revision of last commit.
@@ -11,7 +11,7 @@
 
 __version__ = "$Rev: 48550 $"
 
-import ConfigParser
+import configparser
 import despymisc.miscutils as miscutils
 import despydmdb.desdmdbi as desdmdbi
 
@@ -27,7 +27,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         return {'use_db':'opt', 'des_services':'opt', 'des_db_section':'req',
                 'parent_task_id':'req', 'root_task_id':'req',
                 'transfer_stats_per_file':'opt',
-                'connection':'opt','threaded':'opt'}
+                'connection':'opt', 'threaded':'opt'}
 
 
     def __init__(self, config, fullcfg=None):
@@ -47,17 +47,17 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
             self.section = config['des_db_section']
         have_connect = False
         if 'connection' in config:
-             try:
+            try:
                 desdmdbi.DesDmDbi.__init__(self, connection=config['connection'])
                 have_connect = True
-             except:
+            except:
                 miscutils.fwdebug_print('Could not connect to DB using transferred connection, falling back to new connection.')
         if not have_connect:
             try:
                 desdmdbi.DesDmDbi.__init__(self, self.desservices, self.section)
-            except (ConfigParser.NoSectionError, IOError) as err:
-                miscutils.fwdie("Error: problem connecting to database: %s\n" \
-                                    "\tCheck desservices file and environment variables" % err, 1)
+            except (configparser.NoSectionError, IOError) as err:
+                miscutils.fwdie(f"Error: problem connecting to database: {err}\n" \
+                                    "\tCheck desservices file and environment variables", 1)
 
         self.parent_task_id = config['parent_task_id']
         self.root_task_id = config['root_task_id']
@@ -93,7 +93,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         """ Starting a batch transfer between src and dst (archive or job scratch) """
 
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-            miscutils.fwdebug_print("beg %s %s %s %s" % (transfer_name, src, dst, transclass))
+            miscutils.fwdebug_print(f"beg {transfer_name} {src} {dst} {transclass}")
         self.currvals['transfer_name'] = transfer_name
         self.currvals['src'] = src
         self.currvals['dst'] = dst
@@ -105,8 +105,10 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
                                                           do_begin=True,
                                                           do_commit=False)
 
-        row = {'src': src, 'dst': dst, 'transfer_class': transclass,
-               'parent_task_id': self.parent_task_id, 'task_id': self.currvals['batch_task_id']}
+        row = {'src': src, 'dst': dst,
+               'transfer_class': transclass,
+               'parent_task_id': self.parent_task_id,
+               'task_id': self.currvals['batch_task_id']}
 
         self.basic_insert_row('transfer_batch', row)
         self.commit()
@@ -120,11 +122,11 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         """ Update rows for end of a batch transfer and commit """
 
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-            miscutils.fwdebug_print("beg - %s %s %s" % (status, totbytes, task_id))
+            miscutils.fwdebug_print(f"beg - {status} {totbytes} {task_id}")
         if task_id is None:
             task_id = self.currvals['batch_task_id']
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-            miscutils.fwdebug_print('before end_task, info: %s' % self)
+            miscutils.fwdebug_print(f'before end_task, info: {self}')
         self.end_task(task_id, status)
         wherevals = {'task_id': task_id}
 
@@ -132,7 +134,8 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
             totbytes = self.currvals['totbytes']
         if numfiles == 0:
             numfiles = self.currvals['numfiles']
-        updatevals = {'total_num_bytes': totbytes, 'total_num_files': numfiles}
+        updatevals = {'total_num_bytes': totbytes,
+                      'total_num_files': numfiles}
 
         self.basic_update_row('transfer_batch', updatevals, wherevals)
         self.commit()
@@ -148,7 +151,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
 
         if self.transfer_stats_per_file:
             if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-                miscutils.fwdebug_print("beg - %s" % filename)
+                miscutils.fwdebug_print(f"beg - {filename}")
             if self.currvals['batch_task_id'] is None:
                 raise Exception('Cannot call this function without prior calling stat_beg_batch')
 
@@ -167,7 +170,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
 
             self.currvals['file_task_id'] = row['task_id']
             if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-                miscutils.fwdebug_print("end - file_task_id = %s" % self.currvals['file_task_id'])
+                miscutils.fwdebug_print(f"end - file_task_id = {self.currvals['file_task_id']}")
         return self.currvals['file_task_id']
 
 
@@ -180,7 +183,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
 
         if self.transfer_stats_per_file:
             if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-                miscutils.fwdebug_print("beg - %s %s %s" % (status, nbytes, task_id))
+                miscutils.fwdebug_print(f"beg - {status} {nbytes} {task_id}")
 
             if task_id is None:
                 task_id = self.currvals['file_task_id']

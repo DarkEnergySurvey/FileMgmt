@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # OSG/FNAL User Support, December 2013
 
@@ -33,7 +33,7 @@ def summarize_copy_stats(fname):
     #  ('fromarchive') or from ('toarchive') the job, and whose second
     #  element is the total number of bytes spent copying that file in
     #  that direction.
-    
+
     for line in fileinput.input(fname):
         F = line.split()
         num_copies = max(num_copies, int(F[2])+1)

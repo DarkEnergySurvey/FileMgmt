@@ -26,7 +26,7 @@ def get_md5sum_file(fullname, blksize=2**15):
 
     md5 = hashlib.md5()
     with open(fullname, 'rb') as fhandle:
-        for chunk in iter(lambda: fhandle.read(blksize), ''):
+        for chunk in iter(lambda: fhandle.read(blksize), b''):
             md5.update(chunk)
     return md5.hexdigest()
 
@@ -36,10 +36,10 @@ def get_file_disk_info(arg):
 
     if isinstance(arg, list):
         return get_file_disk_info_list(arg)
-    elif isinstance(arg, str):
+    if isinstance(arg, str):
         return get_file_disk_info_path(arg)
-    else:
-        miscutils.fwdie("Error:  argument to get_file_disk_info isn't a list or a path (%s)" % type(arg), 1)
+
+    miscutils.fwdie(f"Error:  argument to get_file_disk_info isn't a list or a path ({type(arg)})", 1)
 
 ######################################################################
 def get_single_file_disk_info(fname, save_md5sum=False, archive_root=None):
@@ -47,21 +47,19 @@ def get_single_file_disk_info(fname, save_md5sum=False, archive_root=None):
 
     """
     if miscutils.fwdebug_check(3, "DISK_UTILS_LOCAL_DEBUG"):
-        miscutils.fwdebug_print("fname=%s, save_md5sum=%s, archive_root=%s" % \
-                                (fname, save_md5sum, archive_root))
+        miscutils.fwdebug_print(f"fname={fname}, save_md5sum={save_md5sum}, archive_root={archive_root}")
 
     parsemask = miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION
 
     (path, filename, compress) = miscutils.parse_fullname(fname, parsemask)
     if miscutils.fwdebug_check(3, "DISK_UTILS_LOCAL_DEBUG"):
-        miscutils.fwdebug_print("path=%s, filename=%s, compress=%s" % (path, filename, compress))
+        miscutils.fwdebug_print(f"path={path}, filename={filename}, compress={compress}")
 
-    fdict = {
-        'filename' : filename,
-        'compression': compress,
-        'path': path,
-        'filesize': os.path.getsize(fname)
-        }
+    fdict = {'filename' : filename,
+             'compression': compress,
+             'path': path,
+             'filesize': os.path.getsize(fname)
+             }
 
     if save_md5sum:
         fdict['md5sum'] = get_md5sum_file(fname)
@@ -74,7 +72,7 @@ def get_single_file_disk_info(fname, save_md5sum=False, archive_root=None):
         else:
             compext = compress
 
-        fdict['rel_filename'] = "%s/%s%s" % (fdict['relpath'], filename, compext)
+        fdict['rel_filename'] = f"{fdict['relpath']}/{filename}{compext}"
 
     return fdict
 
@@ -100,7 +98,7 @@ def get_file_disk_info_path(path, save_md5sum=False):
     # if relative path, is treated relative to current directory
 
     if not os.path.exists(path):
-        miscutils.fwdie("Error:  path does not exist (%s)" % (path), 1)
+        miscutils.fwdie(f"Error:  path does not exist ({path})", 1)
 
     fileinfo = {}
     for (dirpath, _, filenames) in os.walk(path):
@@ -130,7 +128,7 @@ def copyfiles(filelist, tstats, verify=False):
                 if tstats is not None:
                     tstats.stat_beg_file(filename)
                 path = os.path.dirname(dst)
-                if len(path) > 0 and not os.path.exists(path):
+                if path and not os.path.exists(path):
                     miscutils.coremakedirs(path)
                 shutil.copy(src, dst)
                 if tstats is not None:
@@ -138,7 +136,7 @@ def copyfiles(filelist, tstats, verify=False):
                 if verify:
                     newfsize = os.path.getsize(dst)
                     if newfsize != fsize:
-                        raise Exception("Incorrect files size for file %s (%i vs %i)" % (filename, newfsize, fsize))
+                        raise Exception(f"Incorrect files size for file {filename} ({newfsize:d} vs {fsize:d})")
         except Exception:
             status = 1
             if tstats is not None:
@@ -182,13 +180,13 @@ def get_files_from_disk(relpath, archive_root, check_md5sum=False, debug=False):
 
     start_time = time.time()
     if debug:
-        print "Getting file information from disk: BEG"
+        print("Getting file information from disk: BEG")
 
     files_from_disk = {}
     duplicates = {}
     for (dirpath, _, filenames) in os.walk(os.path.join(archive_root, relpath)):
         for filename in filenames:
-            fullname = '%s/%s' % (dirpath, filename)
+            fullname = f'{dirpath}/{filename}'
             data = get_single_file_disk_info(fullname, check_md5sum, archive_root)
             if filename in files_from_disk:
                 if filename not in duplicates:
@@ -200,7 +198,7 @@ def get_files_from_disk(relpath, archive_root, check_md5sum=False, debug=False):
 
     end_time = time.time()
     if debug:
-        print "Getting file information from disk: END (%s secs)" % (end_time - start_time)
+        print(f"Getting file information from disk: END ({end_time - start_time} secs)")
     return files_from_disk, duplicates
 
 ####################################################################
@@ -237,7 +235,7 @@ def compare_db_disk(files_from_db, files_from_disk, duplicates, check_md5sum, de
 
     start_time = time.time()
     if debug:
-        print "Comparing file information: BEG"
+        print("Comparing file information: BEG")
     comparison_info = {'equal': [],
                        'dbonly': [],
                        'diskonly': [],
@@ -294,7 +292,7 @@ def compare_db_disk(files_from_db, files_from_disk, duplicates, check_md5sum, de
 
     end_time = time.time()
     if debug:
-        print "Comparing file information: END (%s secs)" % (end_time - start_time)
+        print(f"Comparing file information: END ({end_time - start_time} secs)")
     return comparison_info
 
 def del_files_from_disk(path):
@@ -305,7 +303,7 @@ def del_files_from_disk(path):
 def del_part_files_from_disk(files, archive_root):
     """ delete specific files from disk """
     good = []
-    for key, value in files.iteritems():
+    for key, value in files.items():
         try:
             os.remove(os.path.join(archive_root, value['path'], key))
             good.append(value['id'])

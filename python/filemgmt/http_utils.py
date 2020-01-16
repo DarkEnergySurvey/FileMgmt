@@ -11,7 +11,7 @@ __version__ = "$Rev: 18486 $"
 
 import os
 import sys
-sys.path.append('/home/friedel/.local/lib/python2.7/site-packages')
+#sys.path.append('/home/friedel/.local/lib/python2.7/site-packages')
 import subprocess
 import re
 import traceback
@@ -25,7 +25,7 @@ import filemgmt.utils as utils
 
 
 def http_code_str(hcode):
-    codestr = "Unmapped http_code (%s)" % hcode
+    codestr = f"Unmapped http_code ({hcode})"
     code2str = {'200': 'Success/Ok',
                 '201': 'Success/Created',
                 '204': 'No content (unknown status)',
@@ -47,7 +47,7 @@ def http_code_str(hcode):
         codestr = code2str[str(hcode)]
     return codestr
 
-class HttpUtils():
+class HttpUtils:
     copyfiles_called = 0
 
     def __init__(self, des_services, des_http_section, numtries=5, secondsBetweenRetries=30):
@@ -61,9 +61,9 @@ class HttpUtils():
             self.auth_params = serviceaccess.parse(des_services, des_http_section)
 
             # Create the user/password switch:
-            self.curl_password = "%s:%s" % (self.auth_params['user'], self.auth_params['passwd'])
+            self.curl_password = f"{self.auth_params['user']}:{self.auth_params['passwd']}"
         except Exception as err:
-            miscutils.fwdie("Unable to get curl password (%s)" % err, fmdefs.FM_EXIT_FAILURE)
+            miscutils.fwdie(f"Unable to get curl password ({err})", fmdefs.FM_EXIT_FAILURE)
         self.curl = pycurl.Curl()
         self.curl.setopt(pycurl.USERPWD, self.curl_password)
         self.existing_directories = set()
@@ -101,11 +101,11 @@ class HttpUtils():
                 rtemp = self.curl.getinfo(pycurl.CONTENT_LENGTH_DOWNLOAD)
                 if rtemp is not None:
                     if i > 0:
-                        print "Verify took %i tries to succeed" % (int(i) + 1)
+                        print(f"Verify took {int(i) + 1} tries to succeed")
                     break
                 time.sleep(5)
                 if i == self.numtries - 1:
-                    print "Failed to verify %s after %i tries." % (self.dst, self.numtries)
+                    print(f"Failed to verify {self.dst} after {self.numtries:d} tries.")
                     return False
             rfsize = int(rtemp)
             if self.filesize == 0:
@@ -141,37 +141,37 @@ class HttpUtils():
 
                     if self.verify():
                         if x > 0:
-                            print "Transfer took %i tries to succeed" % (x + 1)
+                            print(f"Transfer took {x + 1} tries to succeed")
                         return
                 elif httpcode in [200, 201, 301] and not verify:
                     if x > 0:
-                        print "Transfer took %i tries to succeed" % (x + 1)
+                        print(f"Transfer took {x + 1} tries to succeed")
                     return
-            
+
             miscutils.fwdebug_print("*" * 75)
             miscutils.fwdebug_print("CURL FAILURE")
-            miscutils.fwdebug_print("curl command: %s" % cmd)
-            miscutils.fwdebug_print("curl exitcode: %s (%s)" % (exitcode, msg))
+            miscutils.fwdebug_print(f"curl command: {cmd}")
+            miscutils.fwdebug_print(f"curl exitcode: {exitcode} ({msg})")
             if httpcode is not None:
-                miscutils.fwdebug_print("curl http status: %s (%s)" % (httpcode, http_code_str(httpcode)))
+                miscutils.fwdebug_print(f"curl http status: {httpcode} ({http_code_str(httpcode)})")
             else:
                 miscutils.fwdebug_print("curl http status: unknown")
 
             if x < self.numtries-1:    # not the last time in the loop
-                miscutils.fwdebug_print("Sleeping %s secs" % self.secondsBetweenRetries)
+                miscutils.fwdebug_print(f"Sleeping {self.secondsBetweenRetries} secs")
                 time.sleep(self.secondsBetweenRetries)
             else:
-                print "\nDiagnostics:"
-                print "Directory info"
+                print("\nDiagnostics:")
+                print("Directory info")
                 sys.stdout.flush()
                 if miscutils.fwdebug_check(10, "HTTP_UTILS_DEBUG"):
                     utils.find_ls('.')
                 elif self.src is not None:
-                    print utils.ls_ld(self.src)
+                    print(utils.ls_ld(self.src))
                 else:
-                    print os.getcwd()
-                    print "Source file is not local"
-                print "\nFile system disk space usage"
+                    print(os.getcwd())
+                    print("Source file is not local")
+                print("\nFile system disk space usage")
                 utils.df_h('.')
 
                 sys.stdout.flush()
@@ -183,31 +183,39 @@ class HttpUtils():
                 if hostm:
                     hname = hostm.group(1)
                     try:   # don't let exception here halt
-                        print "Running commands to %s for diagnostics" % hname
-                        print "\nPinging %s" % hname
+                        print(f"Running commands to {hname} for diagnostics")
+                        print(f"\nPinging {hname}")
                         sys.stdout.flush()
-                        stat = subprocess.Popen("ping -c 4 %s" % hname, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        stat = subprocess.Popen(f"ping -c 4 {hname}",
+                                                shell=True,
+                                                stdout=subprocess.PIPE,
+                                                stderr=subprocess.PIPE,
+                                                text=True)
                         curl_stdout = stat.communicate()[0]
-                        print curl_stdout
-                        print "\nRunning traceroute to %s" % hname
+                        print(curl_stdout)
+                        print(f"\nRunning traceroute to {hname}")
                         sys.stdout.flush()
-                        stat = subprocess.Popen("traceroute %s" % hname, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        stat = subprocess.Popen(f"traceroute {hname}",
+                                                shell=True,
+                                                stdout=subprocess.PIPE,
+                                                stderr=subprocess.PIPE,
+                                                text=True)
                         curl_stdout = stat.communicate()[0]
-                        print curl_stdout
+                        print(curl_stdout)
                     except:   # print exception but continue
                         (etype, value, trback) = sys.exc_info()
                         traceback.print_exception(etype, value, trback, file=sys.stdout)
-                        print "\n\nIgnoring remote diagnostics exception.   Continuing.\n"
+                        print("\n\nIgnoring remote diagnostics exception.   Continuing.\n")
                 else:
-                    print "Couldn't find url in curl cmd:", cmd
-                    print "Skipping remote diagnostics.\n"
+                    print("Couldn't find url in curl cmd:", cmd)
+                    print("Skipping remote diagnostics.\n")
 
-                print "*" * 75
+                print("*" * 75)
                 sys.stdout.flush()
 
-        errmsg = "Curl operation failed with return code %d (%s), " % (exitcode, msg)
+        errmsg = f"Curl operation failed with return code {exitcode:d} ({msg}), "
         if httpcode is not None:
-            errmsg += " http status %s (%s)" % (httpcode, http_code_str(httpcode))
+            errmsg += f" http status {httpcode} ({http_code_str(httpcode)})"
         else:
             errmsg += " http status unknown"
 
@@ -218,13 +226,13 @@ class HttpUtils():
 
         """
         # Making bar/ sometimes returns a 301 status even if there doesn't seem to be a bar/ in the directory.
-        m = re.match("(http://[^/]+)(/.*)", f)
+        m = re.match(r"(http://[^/]+)(/.*)", f)
         self.curl.setopt(pycurl.CUSTOMREQUEST, 'MKCOL')
         self.curl.setopt(pycurl.WRITEFUNCTION, lambda x: None)
         for x in miscutils.get_list_directories([m.group(2)]):
             if x not in self.existing_directories:
-                self.curl.setopt(pycurl.URL, m.group(1)+x)
-                if(self.perform(cmd='MKCOL %s' % (m.group(1)+x))):
+                self.curl.setopt(pycurl.URL, m.group(1) + x)
+                if self.perform(cmd=f'MKCOL {m.group(1) + x}'):
                     self.existing_directories.add(x)
         self.curl.unsetopt(pycurl.CUSTOMREQUEST)
         #self.curl.unsetopt(pycurl.URL)
@@ -234,7 +242,7 @@ class HttpUtils():
         starttime = time.time()
         self.curl.setopt(pycurl.URL, self.src)
         self.curl.setopt(pycurl.WRITEFUNCTION, open(self.dst, 'wb').write)
-        self.perform(cmd='Get %s' % self.src, verify=verify)
+        self.perform(cmd=f'Get {self.src}', verify=verify)
         #self.curl.unsetopt(pycurl.WRITEFUNCTION)
         #self.curl.unsetopt(pycurl.URL)
         return time.time() - starttime
@@ -249,7 +257,7 @@ class HttpUtils():
         if self.filesize == 0:
             self.filesize = os.path.getsize(self.src)
         self.curl.setopt(pycurl.INFILESIZE, self.filesize)
-        self.perform(cmd='PUT %s to %s' % (self.src, self.dst), verify=verify, upload=True)
+        self.perform(cmd=f'PUT {self.src} to {self.dst}', verify=verify, upload=True)
         #self.curl.unsetopt(pycurl.WRITEFUNCTION)
         #self.curl.unsetopt(pycurl.URL)
         #self.curl.unsetopt(pycurl.INFILESIZE)
@@ -276,8 +284,8 @@ class HttpUtils():
                     (self.src, isurl_src) = self.check_url(fdict['src'])
                     (self.dst, isurl_dst) = self.check_url(fdict['dst'])
                     if (isurl_src and isurl_dst) or (not isurl_src and not isurl_dst):
-                        miscutils.fwdie("Exactly one of isurl_src and isurl_dst has to be true (values: %s %s %s %s)"
-                                        % (isurl_src, self.src, isurl_dst, self.dst), fmdefs.FM_EXIT_FAILURE)
+                        miscutils.fwdie(f"Exactly one of isurl_src and isurl_dst has to be true (values: {isurl_src}, {self.src}, {isurl_dst}, {self.dst}",
+                                        fmdefs.FM_EXIT_FAILURE)
 
                     copy_time = None
 
@@ -288,12 +296,12 @@ class HttpUtils():
 
                         # make the path
                         path = os.path.dirname(self.dst)
-                        if len(path) > 0 and not os.path.exists(path):
+                        if path and not os.path.exists(path):
                             miscutils.coremakedirs(path)
 
                         # getting some non-zero curl exit codes, double check path exists
-                        if len(path) > 0 and not os.path.exists(path):
-                            raise Exception("Error: path still missing after coremakedirs (%s)" % path)
+                        if path and not os.path.exists(path):
+                            raise Exception(f"Error: path still missing after coremakedirs ({path})")
                         copy_time = self.get(verify)
                         if tstats is not None:
                             tstats.stat_end_file(0, self.filesize)
@@ -314,15 +322,10 @@ class HttpUtils():
                         for lines in traceback.format_stack():
                             for L in lines.split('\n'):
                                 if L.strip() != '':
-                                    miscutils.fwdebug_print("call stack: %s" % L)
+                                    miscutils.fwdebug_print(f"call stack: {L}")
 
                     if miscutils.fwdebug_check(3, "HTTP_UTILS_DEBUG"):
-                        miscutils.fwdebug_print("Copy info: %s %s %s %s %s %s" % (HttpUtils.copyfiles_called,
-                                                                                  fdict['filename'],
-                                                                                  self.filesize,
-                                                                                  copy_time,
-                                                                                  time.time(),
-                                                                                  'toarchive' if isurl_dst else 'fromarchive'))
+                        miscutils.fwdebug_print(f"Copy info: {HttpUtils.copyfiles_called} {fdict['filename']} {self.filesize} {copy_time} {time.time()} {'toarchive' if isurl_dst else 'fromarchive'}")
 
                     if copy_time is None:
                         copy_time = 0
@@ -342,21 +345,7 @@ class HttpUtils():
                     miscutils.fwdebug_print(str(err))
 
         finally:
-            print "[Copy summary] copy_batch:%d  file_copies_to_archive:%d time_to_archive:%.3f copies_from_archive:%d time_from_archive:%.3f  end_time_for_batch:%.3f" % \
-            (HttpUtils.copyfiles_called, num_copies_to_archive, total_copy_time_to_archive, num_copies_from_archive, total_copy_time_from_archive, time.time())
+            print(f"[Copy summary] copy_batch:{HttpUtils.copyfiles_called:d}  file_copies_to_archive:{num_copies_to_archive:d} time_to_archive:{total_copy_time_to_archive:.3f} copies_from_archive:{num_copies_from_archive:d} time_from_archive:{total_copy_time_from_archive:.3f}  end_time_for_batch:{time.time():3f}")
 
         HttpUtils.copyfiles_called += 1
         return (status, filelist)
-
-
-
-
-#if __name__ == "__main__":
-    # To run these unit tests first copy .desservices.ini_example to .desservices.ini
-    # in test_http_utils/, and set user and passwd. Then use this command:
-    #    python ./http_utils.py -v
-#    import doctest
-#    doctest.testmod()
-#    C = HttpUtils('test_http_utils/.desservices.ini', 'file-http')
-#    C.test_copyfiles()
-    # miscutils.fwdie("Test miscutils.fwdie", fmdefs.FM_EXIT_FAILURE)

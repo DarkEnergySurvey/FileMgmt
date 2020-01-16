@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: ftmgmt_raw.py 46337 2017-10-20 13:42:15Z friedel $
 # $Rev:: 46337                            $:  # Revision of last commit.
 # $LastChangedBy:: friedel                $:  # Author of last commit.
@@ -13,9 +11,9 @@ Generic filetype management class used to do filetype specific tasks
 __version__ = "$Rev: 46337 $"
 
 from datetime import datetime
-import pyfits
 import os
 
+from astropy.io import fits
 import despydmdb.dmdb_defs as dmdbdefs
 from filemgmt.ftmgmt_genfits import FtMgmtGenFits
 import despymisc.miscutils as miscutils
@@ -28,7 +26,7 @@ class FtMgmtRaw(FtMgmtGenFits):
     def __init__(self, filetype, dbh, config, filepat=None):
         """ Initialize object """
         # config must have filetype_metadata, file_header_info, keywords_file (OPT)
-        FtMgmtGenFits.__init__(self, filetype, dbh, config, filepat)
+        super().__init__(self, filetype, dbh, config, filepat)
 
 
     ######################################################################
@@ -45,10 +43,9 @@ class FtMgmtRaw(FtMgmtGenFits):
             byfilename[filename] = fname
 
         #self.dbh.empty_gtt(dmdbdefs.DB_GTT_FILENAME)
-        self.dbh.load_filename_gtt(byfilename.keys())
+        self.dbh.load_filename_gtt(list(byfilename.keys()))
 
-        dbq = "select r.filename from rasicam_decam r, %s g where r.filename=g.filename" % \
-                 (dmdbdefs.DB_GTT_FILENAME)
+        dbq = f"select r.filename from rasicam_decam r, {dmdbdefs.DB_GTT_FILENAME} g where r.filename=g.filename"
         curs = self.dbh.cursor()
         curs.execute(dbq)
 
@@ -72,15 +69,15 @@ class FtMgmtRaw(FtMgmtGenFits):
 
         # open file
         #hdulist = pyfits.open(fullname, 'update')
-        primary_hdr = pyfits.getheader(fullname, 0)
-        prihdu = pyfits.PrimaryHDU(header=primary_hdr)
-        hdulist = pyfits.HDUList([prihdu])
+        primary_hdr = fits.getheader(fullname, 0)
+        prihdu = fits.PrimaryHDU(header=primary_hdr)
+        hdulist = fits.HDUList([prihdu])
 
 
         # read metadata and call any special calc functions
         metadata, _ = self._gather_metadata_file(fullname, hdulist=hdulist)
         if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-            miscutils.fwdebug_print("INFO: file=%s" % (fullname))
+            miscutils.fwdebug_print(f"INFO: file={fullname}")
 
         # call function to update headers
         if do_update:
@@ -104,7 +101,7 @@ class FtMgmtRaw(FtMgmtGenFits):
 
         for fullname in listfullnames:
             if not os.path.isfile(fullname):
-                raise OSError("Exposure file not found: '%s'" % fullname)
+                raise OSError(f"Exposure file not found: '{fullname}'")
 
             filename = miscutils.parse_fullname(fullname, miscutils.CU_PARSE_FILENAME)
 
@@ -115,17 +112,17 @@ class FtMgmtRaw(FtMgmtGenFits):
                 hdulist = kwargs['hdulist']
                 primary_hdr = hdulist[0].header
             else:
-                primary_hdr = pyfits.getheader(fullname, 0)
+                primary_hdr = fits.getheader(fullname, 0)
 
             row = get_vals_from_header(primary_hdr)
             row['filename'] = filename
             row['source'] = 'HEADER'
             row['analyst'] = 'DTS.ingest'
 
-            if len(row) > 0:
+            if row:
                 self.dbh.basic_insert_row(dbtable, row)
             else:
-                raise Exception("No RASICAM header keywords identified for %s" % filename)
+                raise Exception(f"No RASICAM header keywords identified for {filename}")
 
 
     ######################################################################
@@ -142,19 +139,19 @@ class FtMgmtRaw(FtMgmtGenFits):
         if 'raw_keywords_file' in self.config:
             keyfile = self.config['raw_keywords_file']
         elif 'FILEMGMT_DIR' in os.environ:
-            keyfile = '%s/etc/decam_src_keywords.txt' % os.environ['FILEMGMT_DIR']
+            keyfile = f"{os.environ['FILEMGMT_DIR']}/etc/decam_src_keywords.txt"
 
-        miscutils.fwdebug_print("keyfile = %s" % keyfile)
+        miscutils.fwdebug_print(f"keyfile = {keyfile}")
         if keyfile is not None and os.path.exists(keyfile):
             keywords = {'pri':{}, 'ext':{}}
             with open(keyfile, 'r') as keyfh:
                 for line in keyfh:
                     line = line.upper()
                     (keyname, pri, ext) = miscutils.fwsplit(line, ',')[0:3]
-                    if pri != 'Y' and pri != 'N' and pri != 'R':
-                        raise ValueError('Invalid primary entry in keyword file (%s)' % line)
-                    if ext != 'Y' and ext != 'N' and ext != 'R':
-                        raise ValueError('Invalid extenstion entry in keyword file (%s)' % line)
+                    if pri not in ['Y', 'N', 'R']:
+                        raise ValueError(f'Invalid primary entry in keyword file ({line})')
+                    if ext not in ['Y', 'N', 'R']:
+                        raise ValueError(f'Invalid extenstion entry in keyword file ({line})')
                     keywords['pri'][keyname] = pri
                     keywords['ext'][keyname] = ext
 
@@ -171,14 +168,14 @@ def check_single_valid(keywords, fullname, verbose): # should raise exception if
     """ Check whether the given file is a valid raw file """
 
     # check fits file
-    hdulist = pyfits.open(fullname)
+    hdulist = fits.open(fullname)
     prihdr = hdulist[0].header
 
     # check exposure has correct filename (sometimes get NOAO-science-archive renamed exposures)
     correct_filename = prihdr['FILENAME']
     actual_filename = miscutils.parse_fullname(fullname, miscutils.CU_PARSE_FILENAME)
     if actual_filename != correct_filename:
-        raise ValueError('Error: invalid filename (%s)' % actual_filename)
+        raise ValueError(f'Error: invalid filename ({actual_filename})')
 
 
     instrume = prihdr['INSTRUME'].lower()
@@ -187,12 +184,12 @@ def check_single_valid(keywords, fullname, verbose): # should raise exception if
     if instrume == 'decam':
         req_num_hdus = 71
     else:
-        raise ValueError('Error:  Unknown instrume (%s)' % instrume)
+        raise ValueError(f'Error:  Unknown instrume ({instrume})')
 
     # check # hdus
     num_hdus = len(hdulist)
     if num_hdus != req_num_hdus:
-        raise ValueError('Error:  Invalid number of hdus (%s)' % num_hdus)
+        raise ValueError(f'Error:  Invalid number of hdus ({num_hdus})')
 
     # check keywords
     for hdunum in range(0, num_hdus):
@@ -200,13 +197,13 @@ def check_single_valid(keywords, fullname, verbose): # should raise exception if
         (req, want, extra) = check_header_keywords(keywords, hdunum, hdr)
 
         if verbose > 1:
-            if want is not None and len(want) > 0:
-                print "HDU #%02d Missing requested keywords: %s" % (hdunum, want)
-            if extra is not None and len(extra) > 0:
-                print "HDU #%02d Extra keywords: %s" % (hdunum, extra)
+            if want is not None and want:
+                print(f"HDU #{hdunum:02d} Missing requested keywords: {want}")
+            if extra is not None and extra:
+                print(f"HDU #{hdunum:02d} Extra keywords: {extra}")
 
-        if req is not None and len(req) > 0:
-            raise ValueError('Error: HDU #%02d Missing required keywords (%s)' % (hdunum, req))
+        if req is not None and req:
+            raise ValueError(f'Error: HDU #{hdunum:02d} Missing required keywords ({req})')
 
     return True
 
@@ -234,14 +231,10 @@ def check_header_keywords(keywords, hdunum, hdr):
 
     # check for extra keywords
     for keyw in hdr:
-        if keyw not in keywords[hdutype] or \
-            keywords[hdutype][keyw] == 'N':
+        if keyw not in keywords[hdutype] or keywords[hdutype][keyw] == 'N':
             extra.append(keyw)
 
     return (req_missing, want_missing, extra)
-
-
-
 
 ######################################################################
 def get_vals_from_header(primary_hdr):
@@ -250,17 +243,17 @@ def get_vals_from_header(primary_hdr):
 
     #  Keyword list needed to update the database.
     #     i=int, f=float, b=bool, s=str, date=date
-    keylist = {'EXPNUM':'i',
-               'INSTRUME':'s',
-               'SKYSTAT':'b',
-               'SKYUPDAT':'date',
-               'GSKYPHOT':'b',
-               'LSKYPHOT':'b',
-               'GSKYVAR':'f',
-               'GSKYHOT':'f',
-               'LSKYVAR':'f',
-               'LSKYHOT':'f',
-               'LSKYPOW':'f'}
+    keylist = {'EXPNUM': 'i',
+               'INSTRUME': 's',
+               'SKYSTAT': 'b',
+               'SKYUPDAT': 'date',
+               'GSKYPHOT': 'b',
+               'LSKYPHOT': 'b',
+               'GSKYVAR': 'f',
+               'GSKYHOT': 'f',
+               'LSKYVAR': 'f',
+               'LSKYHOT': 'f',
+               'LSKYPOW': 'f'}
 
     vals = {}
     for key, ktype in keylist.items():

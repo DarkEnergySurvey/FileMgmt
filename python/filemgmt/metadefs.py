@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: metadefs.py 41008 2015-12-11 15:55:43Z mgower $
 # $Rev:: 41008                            $:  # Revision of last commit.
 # $LastChangedBy:: mgower                 $:  # Author of last commit.

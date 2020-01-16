@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: archive_transfer_utils.py 41008 2015-12-11 15:55:43Z mgower $
 # $Rev:: 41008                            $:  # Revision of last commit.
 # $LastChangedBy:: mgower                 $:  # Author of last commit.
@@ -22,12 +20,12 @@ def get_config_vals(archive_info, config, keylist):
             info[k] = config[k]
         elif stat.lower() == 'req':
             miscutils.fwdebug_print('******************************')
-            miscutils.fwdebug_print('keylist = %s' % keylist)
-            miscutils.fwdebug_print('archive_info = %s' % archive_info)
-            miscutils.fwdebug_print('config = %s' % config)
-            miscutils.fwdie('Error: Could not find required key (%s)' % k, 1, 2)
+            miscutils.fwdebug_print(f'keylist = {keylist}')
+            miscutils.fwdebug_print(f'archive_info = {archive_info}')
+            miscutils.fwdebug_print(f'config = {config}')
+            miscutils.fwdie(f'Error: Could not find required key ({k})', 1, 2)
     return info
-              
+
 
 
 def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, filelist, config=None):
@@ -45,21 +43,21 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
     dstfilemgmt = dstfilemgmt_class(config=valDict)
 
     if miscutils.fwdebug_check(0, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("dst_archive = %s" % dst_archive)
-    dst_file_archive_info = dstfilemgmt.get_file_archive_info(filelist, dst_archive, 
+        miscutils.fwdebug_print(f"dst_archive = {dst_archive}")
+    dst_file_archive_info = dstfilemgmt.get_file_archive_info(filelist, dst_archive,
                                                               fmdefs.FM_PREFER_UNCOMPRESSED)
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("number of files already at dst %s" % len(dst_file_archive_info))
+        miscutils.fwdebug_print(f"number of files already at dst {len(dst_file_archive_info)}")
     if miscutils.fwdebug_check(6, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("dst_file_archive_info %s" % dst_file_archive_info)
+        miscutils.fwdebug_print(f"dst_file_archive_info {dst_file_archive_info}")
     files2stage = set(filelist) - set(dst_file_archive_info.keys())
 
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("number of files to stage %s" % len(files2stage))
+        miscutils.fwdebug_print(f"number of files to stage {len(files2stage)}")
     if miscutils.fwdebug_check(6, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("files to stage %s" % files2stage)
+        miscutils.fwdebug_print(f"files to stage {files2stage}")
 
-    if files2stage is not None and len(files2stage) > 0:
+    if files2stage is not None and files2stage:
         ## Stage files not already on dst
         # dynamically load filemgmt class for src
         srcfilemgmt_class = miscutils.dynamically_load_class(src_archive_info['filemgmt'])
@@ -70,10 +68,10 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
         src_file_archive_info = srcfilemgmt.get_file_archive_info(files2stage, src_archive, fmdefs.FM_PREFER_COMPRESSED)
         missing_files = set(files2stage) - set(src_file_archive_info.keys())
 
-        if missing_files is not None and len(missing_files) > 0:
-            print "Error:  Could not find the following files on the src archive"
+        if missing_files is not None and missing_files:
+            print("Error:  Could not find the following files on the src archive")
             for f in missing_files:
-                print "\t%s" % f
+                print(f"\t{f}")
             miscutils.fwdie("Error: Missing files", 1)
 
         # dst rel path will be same as src rel path
@@ -83,7 +81,7 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
         files2copy = {}
         for filename, fileinfo in src_file_archive_info.items():
             if miscutils.fwdebug_check(6, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-                miscutils.fwdebug_print("%s: fileinfo = %s" % (filename, fileinfo))
+                miscutils.fwdebug_print(f"{filename}: fileinfo = {fileinfo}")
             files2copy[filename] = copy.deepcopy(fileinfo)
             #files2copy[filename]['src'] = "%s/%s" % (src_root, fileinfo['rel_filename'])
             #iles2copy[filename]['dst'] = "%s/%s" % (dst_root, fileinfo['rel_filename'])
@@ -98,23 +96,23 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
         elif dst_archive in archive_transfer_info and src_archive in archive_transfer_info[dst_archive]:
             transinfo = archive_transfer_info[dst_archive][src_archive]
         else:
-            miscutils.fwdie("Error:  Could not determine transfer class for %s and %s" % (src_archive, dst_archive), 1)
+            miscutils.fwdie(f"Error:  Could not determine transfer class for {src_archive} and {dst_archive}", 1)
 
         # import archive 2 archive class
-        print "loading archive transfer class: %s" % transinfo['transfer']
+        print(f"loading archive transfer class: {transinfo['transfer']}")
         transobj = None
         try:
             transfer_class = miscutils.dynamically_load_class(transinfo['transfer'])
             valDict = get_config_vals(transinfo, config, transfer_class.requested_config_vals())
             transobj = transfer_class(src_archive_info, dst_archive_info, transinfo, valDict)
         except Exception as err:
-            print "ERROR\nError: creating archive transfer object\n%s" % err
+            print(f"ERROR\nError: creating archive transfer object\n{err}")
             raise
 
         starttime = time.time()    # save start time
         results = transobj.blocking_transfer(files2copy)
         endtime = time.time()     # save end time
-        print "\tTransfering %s file(s) took %s seconds" % (len(files2copy),endtime - starttime)
+        print(f"\tTransfering {len(files2copy)} file(s) took {endtime - starttime} seconds")
 
         files2register = {}
         problemfiles = {}
@@ -124,27 +122,23 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
             else:
                 files2register[f] = finfo
 
-        if problemfiles is not None and len(problemfiles) > 0:
-            print "Error: Problems copying files from home archive to target archive"
-            print problemfiles
-            for f,pinfo in problemfiles.items():
-                print "\t%s %s -> %s: %s" % (f, pinfo['src'], pinfo['dst'], pinfo['err'])
-        elif len(files2register) > 0:
+        if problemfiles is not None and problemfiles:
+            print("Error: Problems copying files from home archive to target archive")
+            print(problemfiles)
+            for f, pinfo in problemfiles.items():
+                print(f"\t{f} {pinfo['src']} -> {pinfo['dst']}: {pinfo['err']}")
+        elif files2register:
             regprobs = dstfilemgmt.register_file_in_archive(files2register, dst_archive)
-            if regprobs is not None and len(regprobs) > 0:
+            if regprobs is not None and regprobs:
                 problemfiles.update(regprobs)
 
-            if len(problemfiles) > 0:
-                print "ERROR\n\n\nError: putting %0d files into archive" % len(problemfiles)
+            if problemfiles:
+                print(f"ERROR\n\n\nError: putting {len(problemfiles):0d} files into archive")
                 for file in problemfiles:
-                    print file, problemfiles[file]
+                    print(file, problemfiles[file])
                     sys.exit(1)
             else:
                 dstfilemgmt.commit()
-
-
-        # if db, save staging info to DB
-        # todo
 
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
         miscutils.fwdebug_print("END\n\n")
@@ -152,7 +146,7 @@ def archive_copy(src_archive_info, dst_archive_info, archive_transfer_info, file
 
 def archive_copy_dir(src_archive_info, dst_archive_info, archive_transfer_info, relpath, config=None):
     # relpath is relative path within archive
-    # this function doesn't check which files already exist on dst.   
+    # this function doesn't check which files already exist on dst.
 
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
         miscutils.fwdebug_print("BEG")
@@ -168,9 +162,9 @@ def archive_copy_dir(src_archive_info, dst_archive_info, archive_transfer_info, 
     dstfilemgmt = dstfilemgmt_class(config=valDict)
 
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
-        miscutils.fwdebug_print("dst_archive = %s" % dst_archive)
+        miscutils.fwdebug_print(f"dst_archive = {dst_archive}")
 
-    
+
     ## dynamically load filemgmt class for src
     #srcfilemgmt_class = miscutils.dynamically_load_class(src_archive_info['filemgmt'])
     #valDict = get_config_vals(src_archive_info, config, srcfilemgmt_class.requested_config_vals())
@@ -194,8 +188,7 @@ def archive_copy_dir(src_archive_info, dst_archive_info, archive_transfer_info, 
     elif dst_archive in archive_transfer_info and src_archive in archive_transfer_info[dst_archive]:
         transinfo = archive_transfer_info[dst_archive][src_archive]
     else:
-        miscutils.fwdie("Error:  Could not determine transfer class for %s and %s" % \
-                        (src_archive, dst_archive), 1)
+        miscutils.fwdie(f"Error:  Could not determine transfer class for {src_archive} and {dst_archive}", 1)
 
     # import archive 2 archive class
     transobj = None
@@ -204,13 +197,13 @@ def archive_copy_dir(src_archive_info, dst_archive_info, archive_transfer_info, 
         valDict = get_config_vals(transinfo, config, transfer_class.requested_config_vals())
         transobj = transfer_class(src_archive_info, dst_archive_info, transinfo, valDict)
     except Exception as err:
-        print "ERROR\nError: creating archive transfer object\n%s" % err
+        print(f"ERROR\nError: creating archive transfer object\n{err}")
         raise
 
     starttime = time.time()    # save start time
     transresults = transobj.transfer_directory(relpath)
     endtime = time.time()     # save end time
-    print "\tTransfering directory %s took %s seconds" % (relpath, endtime - starttime)
+    print(f"\tTransfering directory {relpath} took {endtime - starttime} seconds")
 
     files2register = {}
     problemfiles = {}
@@ -220,27 +213,23 @@ def archive_copy_dir(src_archive_info, dst_archive_info, archive_transfer_info, 
         else:
             files2register[f] = finfo
 
-    if problemfiles is not None and len(problemfiles) > 0:
-        print "Error: Problems copying files from home archive to target archive"
+    if problemfiles is not None and problemfiles:
+        print("Error: Problems copying files from home archive to target archive")
         for f in problemfiles:
-            print problemfiles[f]
-            print "\t%s %s: %s" % (f, problemfiles[f]['dst'], problemfiles[f]['err'])
-    elif len(files2register) > 0:
+            print(problemfiles[f])
+            print(f"\t{f} {problemfiles[f]['dst']}: {problemfiles[f]['err']}")
+    elif files2register:
         regprobs = dstfilemgmt.register_file_in_archive(files2register, dst_archive)
-        if regprobs is not None and len(regprobs) > 0:
+        if regprobs is not None and regprobs:
             problemfiles.update(regprobs)
 
-        if len(problemfiles) > 0:
-            print "ERROR\n\n\nError: putting %0d files into archive" % len(problemfiles)
+        if problemfiles:
+            print(f"ERROR\n\n\nError: putting {len(problemfiles):0d} files into archive")
             for file in problemfiles:
-                print file, problemfiles[file]
+                print(file, problemfiles[file])
                 sys.exit(1)
         else:
             dstfilemgmt.commit()
-
-
-        # if db, save staging info to DB
-        # todo
 
     if miscutils.fwdebug_check(3, "ARCHIVE_TRANSFER_UTILS_DEBUG"):
         miscutils.fwdebug_print("END\n\n")

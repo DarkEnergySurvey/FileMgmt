@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: filemgmt_nodb.py 47142 2018-06-20 14:27:28Z friedel $
 # $Rev:: 47142                            $:  # Revision of last commit.
 # $LastChangedBy:: friedel                $:  # Author of last commit.
@@ -16,7 +14,7 @@ import os
 import despymisc.miscutils as miscutils
 import filemgmt.filemgmt_defs as fmdefs
 
-class FileMgmtNoDB(object):
+class FileMgmtNoDB:
     """
     """
 
@@ -83,10 +81,10 @@ class FileMgmtNoDB(object):
             miscutils.fwdie('Error: Missing archive section in config', 1)
 
         if arname not in self.config['archive']:
-            miscutils.fwdie('Error: Invalid archive name (%s)' % arname, 1)
+            miscutils.fwdie(f'Error: Invalid archive name ({arname})', 1)
 
         if 'root' not in self.config['archive'][arname]:
-            miscutils.fwdie('Error: Missing root in archive def (%s)' % self.config['archive'][arname], 1)
+            miscutils.fwdie(f"Error: Missing root in archive def ({self.config['archive'][arname]})", 1)
 
         if not isinstance(compress_order, list):
             miscutils.fwdie('Error:  Invalid compress_order.  It must be a list of compression extensions (including None)', 1)
@@ -99,21 +97,21 @@ class FileMgmtNoDB(object):
         root = self.config['archive'][arname]['root']
         root = root.rstrip("/")  # canonicalize - remove trailing / to ensure
 
-        for (dirpath, dirnames, filenames) in os.walk(root, followlinks=True):
+        for (dirpath, _, filenames) in os.walk(root, followlinks=True):
             for fname in filenames:
                 d = {}
                 (d['filename'], d['compression']) = miscutils.parse_fullname(fname, 3)
-                d['filesize'] = os.path.getsize("%s/%s" % (dirpath, fname))
-                d['path'] = dirpath[len(root)+1:]
+                d['filesize'] = os.path.getsize(f"{dirpath}/{fname}")
+                d['path'] = dirpath[len(root) + 1:]
                 if d['compression'] is None:
                     compext = ""
                 else:
                     compext = d['compression']
-                d['rel_filename'] = "%s/%s%s" % (d['path'], d['filename'], compext)
+                d['rel_filename'] = f"{d['path']}/{d['filename']}{compext}"
                 fullnames[d['compression']][d['filename']] = d
 
-        print "uncompressed:", len(fullnames[None])
-        print "compressed:", len(fullnames['.fz'])
+        print("uncompressed:", len(fullnames[None]))
+        print("compressed:", len(fullnames['.fz']))
 
         # go through given list of filenames and find archive location and compreesion
         archiveinfo = {}
@@ -125,7 +123,7 @@ class FileMgmtNoDB(object):
                     archiveinfo[name] = fullnames[p][name]
                     break
 
-        print "archiveinfo = ", archiveinfo
+        print("archiveinfo = ", archiveinfo)
         return archiveinfo
 
 
@@ -138,10 +136,10 @@ class FileMgmtNoDB(object):
             miscutils.fwdie('Error: Missing archive section in config', 1)
 
         if arname not in self.config['archive']:
-            miscutils.fwdie('Error: Invalid archive name (%s)' % arname, 1)
+            miscutils.fwdie(f'Error: Invalid archive name ({arname})', 1)
 
         if 'root' not in self.config['archive'][arname]:
-            miscutils.fwdie('Error: Missing root in archive def (%s)' % self.config['archive'][arname], 1)
+            miscutils.fwdie(f"Error: Missing root in archive def ({self.config['archive'][arname]})", 1)
 
         if not isinstance(compress_order, list):
             miscutils.fwdie('Error:  Invalid compress_order.  It must be a list of compression extensions (including None)', 1)
@@ -155,22 +153,22 @@ class FileMgmtNoDB(object):
         root = root.rstrip("/")  # canonicalize - remove trailing / to ensure
 
         list_by_name = {}
-        for (dirpath, dirnames, filenames) in os.walk(root + '/' + path):
+        for (dirpath, _, filenames) in os.walk(root + '/' + path):
             for fname in filenames:
                 d = {}
                 (d['filename'], d['compression']) = miscutils.parse_fullname(fname, 3)
-                d['filesize'] = os.path.getsize("%s/%s" % (dirpath, fname))
-                d['path'] = dirpath[len(root)+1:]
+                d['filesize'] = os.path.getsize(f"{dirpath}/{fname}")
+                d['path'] = dirpath[len(root) + 1:]
                 if d['compression'] is None:
                     compext = ""
                 else:
                     compext = d['compression']
-                d['rel_filename'] = "%s/%s%s" % (d['path'], d['filename'], compext)
+                d['rel_filename'] = f"{d['path']}/{d['filename']}{compext}"
                 fullnames[d['compression']][d['filename']] = d
                 list_by_name[d['filename']] = True
 
-        print "uncompressed:", len(fullnames[None])
-        print "compressed:", len(fullnames['.fz'])
+        print("uncompressed:", len(fullnames[None]))
+        print("compressed:", len(fullnames['.fz']))
 
         # go through given list of filenames and find archive location and compreesion
         archiveinfo = {}
@@ -182,7 +180,7 @@ class FileMgmtNoDB(object):
                     archiveinfo[name] = fullnames[p][name]
                     break
 
-        print "archiveinfo = ", archiveinfo
+        print("archiveinfo = ", archiveinfo)
         return archiveinfo
 
     def register_file_data(self, ftype, fullnames, pfw_attempt_id, wgb_task_id,

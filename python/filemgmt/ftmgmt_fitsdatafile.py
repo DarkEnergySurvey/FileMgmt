@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: ftmgmt_fitsdatafile.py 41700 2016-04-19 19:23:55Z mgower $
 # $Rev:: 41700                            $:  # Revision of last commit.
 # $LastChangedBy:: mgower                 $:  # Author of last commit.
@@ -25,15 +23,15 @@ class FtMgmtFitsDatafile(FtMgmtGenFits):
     def __init__(self, filetype, dbh, config, filepat=None):
         """ Initialize object """
         # config must have filetype_metadata and file_header_info
-        FtMgmtGenFits.__init__(self, filetype, dbh, config, filepat)
+        super().__init__(filetype, dbh, config, filepat)
 
         [self.tablename, self.didatadefs] = self.dbh.get_datafile_metadata(filetype)
 
     ######################################################################
     def has_contents_ingested(self, listfullnames):
         """ Check if file has contents ingested """
-        starttime = time.time()
-        assert(isinstance(listfullnames, list))
+        #starttime = time.time()
+        assert isinstance(listfullnames, list)
 
         results = {}
         for fname in listfullnames:
@@ -45,11 +43,11 @@ class FtMgmtFitsDatafile(FtMgmtGenFits):
     def ingest_contents(self, listfullnames, **kwargs):
         """ Ingest certain content into a non-metadata table """
         #starttime = time.time()
-        assert(isinstance(listfullnames, list))
+        assert isinstance(listfullnames, list)
 
         for fname in listfullnames:
-            numrows = dfiutils.datafile_ingest_main(self.dbh, self.filetype, fname,
-                                                    self.tablename, self.didatadefs)
+            _ = dfiutils.datafile_ingest_main(self.dbh, self.filetype, fname,
+                                              self.tablename, self.didatadefs)
             #if numrows == None or numrows == 0:
             #    miscutils.fwdebug_print("WARN: 0 rows ingested from %s" % fname)
             #elif miscutils.fwdebug_check(1, 'FTMGMT_DEBUG'):

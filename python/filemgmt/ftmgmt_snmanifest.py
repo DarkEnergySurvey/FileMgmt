@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: ftmgmt_snmanifest.py 46423 2017-12-19 21:07:55Z friedel $
 # $Rev:: 46423                            $:  # Revision of last commit.
 # $LastChangedBy:: friedel                $:  # Author of last commit.
@@ -11,17 +9,17 @@ Generic filetype management class used to do filetype specific tasks
 """
 
 __version__ = "$Rev: 46423 $"
+import json
 
 import cx_Oracle
-import json
 
 from collections import defaultdict
 
-from filemgmt.ftmgmt_generic import FtMgmtGeneric
 import despydmdb.dmdb_defs as dmdbdefs
-import despymisc.miscutils as miscutils
-import filemgmt.fmutils as fmutils
 import despymisc.misctime as misctime
+import despymisc.miscutils as miscutils
+from filemgmt.ftmgmt_generic import FtMgmtGeneric
+import filemgmt.fmutils as fmutils
 
 
 class FtMgmtSNManifest(FtMgmtGeneric):
@@ -31,7 +29,7 @@ class FtMgmtSNManifest(FtMgmtGeneric):
     def __init__(self, filetype, dbh, config, filepat=None):
         """ Initialize object """
         # config must have filetype_metadata and file_header_info
-        FtMgmtGeneric.__init__(self, filetype, dbh, config, filepat)
+        super().__init__(filetype, dbh, config, filepat)
 
     ######################################################################
     def has_contents_ingested(self, listfullnames):
@@ -47,10 +45,9 @@ class FtMgmtSNManifest(FtMgmtGeneric):
             byfilename[filename] = fname
 
         #self.dbh.empty_gtt(dmdbdefs.DB_GTT_FILENAME)
-        self.dbh.load_filename_gtt(byfilename.keys())
+        self.dbh.load_filename_gtt(list(byfilename.keys()))
 
-        dbq = "select m.manifest_filename from %s m, %s g where m.manifest_filename=g.filename" % \
-                 ("MANIFEST_EXPOSURE", dmdbdefs.DB_GTT_FILENAME)
+        dbq = f"select m.manifest_filename from MANIFEST_EXPOSURE m, {dmdbdefs.DB_GTT_FILENAME} g where m.manifest_filename=g.filename"
         curs = self.dbh.cursor()
         curs.execute(dbq)
 
@@ -71,7 +68,7 @@ class FtMgmtSNManifest(FtMgmtGeneric):
         """ Gather metadata for a single file """
 
         if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-            miscutils.fwdebug_print("INFO: beg  file=%s" % (fullname))
+            miscutils.fwdebug_print(f"INFO: beg  file={fullname}")
 
         metadata = FtMgmtGeneric._gather_metadata_file(self, fullname, **kwargs)
 
@@ -110,9 +107,9 @@ class FtMgmtSNManifest(FtMgmtGeneric):
 
     ######################################################################
     def insert_dictionary_db(self, query, dictionary):
-        """Execute a query and return a cursor to a query
-        :param query: string with query statement
-        :param dictionary: dictionary to use in query
+        """ Execute a query and return a cursor to a query
+            :param query: string with query statement
+            :param dictionary: dictionary to use in query
 
         """
 
@@ -120,18 +117,18 @@ class FtMgmtSNManifest(FtMgmtGeneric):
             cur = self.dbh.cursor()
             cur.execute(query, dictionary)
             if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("dictionary into database " % (dictionary))
+                miscutils.fwdebug_print(f"dictionary into database {dictionary}")
             success = 1
         #except cx_Oracle.IntegrityError as e:
         except cx_Oracle.DatabaseError as exc:
             error, = exc.args
             if error.code == 955:
-                print 'Table already exists'
+                print('Table already exists')
             elif error.code == 1031:
-                print 'Insufficient privileges'
-            print error.code
-            print error.message
-            print error.context
+                print('Insufficient privileges')
+            print(error.code)
+            print(error.message)
+            print(error.context)
             success = 0
             raise
         return success
@@ -163,21 +160,21 @@ class FtMgmtSNManifest(FtMgmtGeneric):
                 valuetoingest = newdicttionary[key][i]
                 dict2ingest[keytoingest] = valuetoingest
             if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("dict2ingest %s " % (dict2ingest))
+                miscutils.fwdebug_print(f"dict2ingest {dict2ingest}")
             try:
                 sql = """insert into MANIFEST_EXPOSURE (CAMSYM,EXPNUM,MANIFEST_FILENAME,NITE,FIELD,BAND,EXPTIME) VALUES
                                     (:CAMSYM, :EXPNUM, :MANIFEST_FILENAME, :NITE, :FIELD, :BAND, :EXPTIME)"""
 
 
                 if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-                    miscutils.fwdebug_print("sql = %s " % (sql))
+                    miscutils.fwdebug_print(f"sql = {sql}")
                 success = self.insert_dictionary_db(sql, dict2ingest)
 
                 if success and miscutils.fwdebug_check(1, 'FTMGMT_DEBUG'):
                     miscutils.fwdebug_print("Insert into EXPOSURES_IN_MANIFEST was successful..")
 
             except cx_Oracle.IntegrityError as exc:
-                print "error while inserting into EXPOSURES_IN_MANIFEST: ", exc
+                print("error while inserting into EXPOSURES_IN_MANIFEST: ", exc)
                 raise
 
 
@@ -191,18 +188,18 @@ class FtMgmtSNManifest(FtMgmtGeneric):
         #Determine index of list for exptime = 10. (poiting exposure)
         allexps = all_exposures['EXPTIME']
         if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-            miscutils.fwdebug_print("all exptimes %s" % (allexps))
+            miscutils.fwdebug_print(f"all exptimes {allexps}")
         for i, val in enumerate(allexps):
             if val == 10.0:
                 pointing_index = i
 
         if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-            miscutils.fwdebug_print("pointing Exposure index is %s" % pointing_index)
+            miscutils.fwdebug_print(f"pointing Exposure index is {pointing_index}")
 
         #find where there are repetead bands, but exclude the band where the exptime = 10
         list_bands = all_exposures['BAND']
         if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-            miscutils.fwdebug_print("listOfaBands...%s" % list_bands)
+            miscutils.fwdebug_print(f"listOfaBands...{list_bands}")
 
         band_indexes = defaultdict(list)
 
@@ -216,18 +213,18 @@ class FtMgmtSNManifest(FtMgmtGeneric):
         flag_first = 0
         for ind, band in enumerate(list_bands):
             if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("indexes %s %s" % (band_indexes[band], ind))
+                miscutils.fwdebug_print(f"indexes {band_indexes[band]} {ind}")
             if ind == pointing_index:
                 if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-                    miscutils.fwdebug_print("found pointing index %s %s " % (ind, pointing_index))
+                    miscutils.fwdebug_print(f"found pointing index {ind} {pointing_index}")
                 continue
             else:
                 #for two exposures and one of them is the poiting
-                if len(band_indexes[band]) <= 2 and ind == pointing_index+1:
+                if len(band_indexes[band]) <= 2 and ind == pointing_index + 1:
                     ind2use.append((max(band_indexes[band])))
                     #print "the index", ind2use
                 #if there are more than 2 exposures (generally for deep fields
-                elif len(band_indexes[band]) > 2 and ind == pointing_index+1:
+                elif len(band_indexes[band]) > 2 and ind == pointing_index + 1:
                     ind2use.append(band_indexes[band][ind])
                     flag_first = 1
                 elif len(band_indexes[band]) == 1:
@@ -250,7 +247,7 @@ class FtMgmtSNManifest(FtMgmtGeneric):
             newdict['FIRST_EXPNUM'] = all_exposures['EXPNUM'][index]
             newdict['SEQNUM'] = all_exposures['SEQNUM'][index]
             if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("index=%s, newdict=%s" % (index, newdict))
+                miscutils.fwdebug_print(f"index={index}, newdict={newdict}")
 
             #Ingest into the database each of them
             try:
@@ -258,12 +255,12 @@ class FtMgmtSNManifest(FtMgmtGeneric):
                                             (:FIELD, :NITE, :BAND, :MANIFEST_FILENAME, :FIRST_EXPNUM, :SEQNUM)"""
 
                 if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-                    miscutils.fwdebug_print("sql = %s" % sql)
+                    miscutils.fwdebug_print(f"sql = {sql}")
 
                 success = self.insert_dictionary_db(sql, newdict)
                 if success and miscutils.fwdebug_check(1, 'FTMGMT_DEBUG'):
                     miscutils.fwdebug_print("Insert into SN_SUBMIT_REQUEST was successful..")
 
             except cx_Oracle.IntegrityError as exc:
-                print "error while inserting into SN_SUBMIT_REQUEST: ", exc
+                print("error while inserting into SN_SUBMIT_REQUEST: ", exc)
                 raise
