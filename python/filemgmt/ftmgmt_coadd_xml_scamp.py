@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: ftmgmt_coadd_xml_scamp.py 41948 2016-05-23 14:27:22Z mgower $
 # $Rev:: 41948                            $:  # Revision of last commit.
 # $LastChangedBy:: mgower                 $:  # Author of last commit.
@@ -24,7 +22,7 @@ class FtMgmtCoaddXmlScamp(FtMgmtDatafile):
     def __init__(self, filetype, dbh, config, filepat=None):
         """ Initialize object """
         # config must have filetype_metadata and file_header_info
-        FtMgmtDatafile.__init__(self, filetype, dbh, config, filepat=None)
+        super().__init__(filetype, dbh, config, filepat=None)
 
         #self.filetype should be 'coadd_xml_scamp'
         self.filetype2 = 'coadd_xml_scamp_2'
@@ -40,24 +38,20 @@ class FtMgmtCoaddXmlScamp(FtMgmtDatafile):
     def ingest_contents(self, listfullnames, **kwargs):
         """ Ingest certain content into a non-metadata table """
 
-        assert(isinstance(listfullnames, list))
+        assert isinstance(listfullnames, list)
 
         for fname in listfullnames:
             miscutils.fwdebug_print("********************* %s" % fname)
             numrows = dfiutils.datafile_ingest_main(self.dbh, self.filetype, fname,
                                                     self.tablename, self.didatadefs)
-            if numrows == None or numrows == 0:
-                miscutils.fwdebug_print("WARN: 0 rows ingested from %s for table %s" % \
-                                        (self.tablename, fname))
+            if numrows in [None, 0]:
+                miscutils.fwdebug_print(f"WARN: 0 rows ingested from {fname} for table {self.tablename}")
             elif miscutils.fwdebug_check(1, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("INFO: %s rows ingested from %s for table %s" % \
-                                        (numrows, self.tablename2, fname))
+                miscutils.fwdebug_print(f"INFO: {numrows} rows ingested from {fname} for table {self.tablename}")
 
             numrows = dfiutils.datafile_ingest_main(self.dbh, self.filetype2, fname,
                                                     self.tablename2, self.didatadefs2)
-            if numrows == None or numrows == 0:
-                miscutils.fwdebug_print("WARN: 0 rows ingested from %s for table %s" % \
-                                        (self.tablename2, fname))
+            if numrows in [None, 0]:
+                miscutils.fwdebug_print(f"WARN: 0 rows ingested from {fname} for table {self.tablename2}")
             elif miscutils.fwdebug_check(1, 'FTMGMT_DEBUG'):
-                miscutils.fwdebug_print("INFO: %s rows ingested from %s for table %s" % 
-                                        (numrows, self.tablename2, fname))
+                miscutils.fwdebug_print(f"INFO: {numrows} rows ingested from {fname} for table {self.tablename2}")

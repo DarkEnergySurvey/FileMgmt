@@ -9,6 +9,7 @@
 __version__ = "$Rev: 18938 $"
 
 import copy
+import os
 
 import despymisc.miscutils as miscutils
 import filemgmt.http_utils as http_utils
@@ -16,7 +17,7 @@ import filemgmt.http_utils as http_utils
 DES_SERVICES = 'des_services'
 DES_HTTP_SECTION = 'des_http_section'
 
-class JobArchiveHttp(object):
+class JobArchiveHttp:
     """
     """
     # assumes home, target, and job dirs are read/write same machine
@@ -34,7 +35,7 @@ class JobArchiveHttp(object):
 
         for x in (DES_SERVICES, DES_HTTP_SECTION):
             if x not in self.config:
-                miscutils.fwdie('Error:  Missing %s in config' % x, 1)
+                miscutils.fwdie(f'Error:  Missing {x} in config', 1)
         self.HU = http_utils.HttpUtils(self.config[DES_SERVICES],
                                        self.config[DES_HTTP_SECTION])
 
@@ -46,7 +47,7 @@ class JobArchiveHttp(object):
 
         absfilelist = copy.deepcopy(filelist)
         for finfo in absfilelist.values():
-            finfo['src'] = self.home['root_http'] + '/' + finfo['src']
+            finfo['src'] = os.path.join(self.home['root_http'], finfo['src'])
 
         if self.tstats is not None:
             self.tstats.stat_beg_batch('home2job', self.home['name'], 'job_scratch', self.__module__ + '.' + self.__class__.__name__)
@@ -61,7 +62,7 @@ class JobArchiveHttp(object):
             raise Exception("Target archive info is None.   Should not be calling this function")
         absfilelist = copy.deepcopy(filelist)
         for finfo in absfilelist.values():
-            finfo['src'] = self.target['root_http'] + '/' + finfo['src']
+            finfo['src'] = os.path.join(self.target['root_http'], finfo['src'])
         if self.tstats is not None:
             self.tstats.stat_beg_batch('target2job', self.target['name'], 'job_scratch', self.__module__ + '.' + self.__class__.__name__)
         (status, results) = self.HU.copyfiles(absfilelist, self.tstats)
@@ -75,7 +76,7 @@ class JobArchiveHttp(object):
             raise Exception("Target archive info is None.   Should not be calling this function")
         absfilelist = copy.deepcopy(filelist)
         for finfo in absfilelist.values():
-            finfo['dst'] = self.target['root_http'] + '/' + finfo['dst']
+            finfo['dst'] = os.path.join(self.target['root_http'], finfo['dst'])
         if self.tstats is not None:
             self.tstats.stat_beg_batch('job2target', 'job_scratch', self.home['name'], self.__module__ + '.' + self.__class__.__name__)
         (status, results) = self.HU.copyfiles(absfilelist, self.tstats)
@@ -90,7 +91,7 @@ class JobArchiveHttp(object):
             raise Exception("Home archive info is None.   Should not be calling this function")
         absfilelist = copy.deepcopy(filelist)
         for finfo in absfilelist.values():
-            finfo['dst'] = self.home['root_http'] + '/' + finfo['dst']
+            finfo['dst'] = os.path.join(self.home['root_http'], finfo['dst'])
         if self.tstats is not None:
             self.tstats.stat_beg_batch('job2home', 'job_scratch', self.home['name'], self.__module__ + '.' + self.__class__.__name__)
         (status, results) = self.HU.copyfiles(absfilelist, self.tstats, verify=verify)

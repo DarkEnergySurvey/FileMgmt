@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # $Id: transfer_stats_nodb.py 48052 2019-01-08 19:53:16Z friedel $
 # $Rev:: 48052                            $:  # Revision of last commit.
 # $LastChangedBy:: friedel                $:  # Author of last commit.
@@ -11,10 +9,12 @@
 
 __version__ = "$Rev: 48052 $"
 
-import ConfigParser
+import time
+import datetime
+import configparser
+
 import despymisc.miscutils as miscutils
 import despydmdb.desdmdbi as desdmdbi
-import time
 
 class TransferStatsDB(desdmdbi.DesDmDbi):
     """
@@ -40,23 +40,23 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         self.__initialize_values__()
 
     def __initialize_values__(self):
-        self.batchvals = {}
-        self.batchvals['transfer_name'] = None
-        self.batchvals['transfer_class'] = None
-        self.batchvals['totbytes'] = 0
-        self.batchvals['numfiles'] = 0
-        self.batchvals['src'] = None
-        self.batchvals['dst'] = None
-        self.batchvals['start_time'] = None
-        self.batchvals['end_time'] = None
-        self.batchvals['status'] = None
+        self.batchvals = {'transfer_name': None,
+                          'transfer_class': None,
+                          'totbytes': 0,
+                          'numfiles': 0,
+                          'src': None,
+                          'dst': None,
+                          'start_time': None,
+                          'end_time': None,
+                          'status': None
+                          }
 
-        self.filevals = {}
-        self.filevals['filename'] = None
-        self.filevals['numbytes'] = None
-        self.filevals['start_time'] = None
-        self.filevals['end_time'] = None
-        self.filevals['status'] = None
+        self.filevals = {'filename': None,
+                         'numbytes': None,
+                         'start_time': None,
+                         'end_time': None,
+                         'status': None
+                         }
 
     def __str__(self):
         return str(self.batchvals) + " ; " + str(self.filevals)
@@ -67,11 +67,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         """ Print stats for transfer batch """
 
         # current epoch time, numfiles, numbytes, trans secs, status
-        print "TRANS_STATS_BATCH: %s %s %s %s %s %s" % \
-              (time.time(), self.batchvals['transfer_name'],
-               self.batchvals['numfiles'], self.filevals['totbytes'],
-               self.filevals['end_time'] - self.filevals['start_time'],
-               self.filevals['status'])
+        print(f"TRANS_STATS_BATCH: {time.time()} {self.batchvals['transfer_name']} {self.batchvals['numfiles']} {self.filevals['totbytes']} {self.filevals['end_time'] - self.filevals['start_time']} {self.filevals['status']}")
 
 
     ############################################################
@@ -79,24 +75,19 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         """ Print stats for transfer file """
 
         # current epoch time, file number, filename, filesize, trans secs, status
-        print "TRANS_STATS_FILE: %s %s %s %s %s %s" % \
-              (time.time(), self.batchvals['numfiles'],
-               self.filevals['filename'], self.filevals['numbytes'],
-               self.filevals['end_time'] - self.filevals['start_time'],
-               self.filevals['status'])
+        print(f"TRANS_STATS_FILE: {time.time()} {self.batchvals['numfiles']} {self.filevals['filename']} {self.filevals['numbytes']} {self.filevals['end_time'] - self.filevals['start_time']} {self.filevals['status']}")
 
     ############################################################
     def stat_beg_batch(self, transfer_name, src, dst, transclass=None):
         """ Starting a batch transfer between src and dst (archive or job scratch) """
 
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-            miscutils.fwdebug_print("beg %s %s %s %s" % \
-                                    (transfer_name, src, dst, transclass))
+            miscutils.fwdebug_print(f"beg {transfer_name} {src} {dst} {transclass}")
         self.batchvals['transfer_name'] = transfer_name
         self.batchvals['src'] = src
         self.batchvals['dst'] = dst
         self.batchvals['transfer_class'] = transclass
-        self.batchvals['start_time'] = time.time.now()
+        self.batchvals['start_time'] = datetime.datetime.now()
 
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
             miscutils.fwdebug_print("end")
@@ -108,16 +99,16 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
         """ Update rows for end of a batch transfer and commit """
 
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
-            miscutils.fwdebug_print("beg - %s %s %s %s" % (status, totbytes, numfiles, task_id))
+            miscutils.fwdebug_print(f"beg - {status} {totbytes} {numfiles} {task_id}")
 
         self.batchvals['status'] = status
-        self.batchvals['end_time'] = time.time.now()
+        self.batchvals['end_time'] = datetime.datetime.now()
         if totbytes != 0:
             self.batchvals['totbytes'] = totbytes
         if numfiles != 0:
             self.batchvals['numfiles'] = numfiles
 
-        print_batch("Batch Copy info:")
+        #print_batch("Batch Copy info:")
 
         self.__initialize_values__()
         if miscutils.fwdebug_check(3, 'TRANSFERSTATS_DEBUG'):
@@ -130,7 +121,7 @@ class TransferStatsDB(desdmdbi.DesDmDbi):
 
         self.batchvals['numfiles'] += 1
         self.filevals['filename'] = filename
-        self.filevals['start_time'] = timt.time()
+        self.filevals['start_time'] = time.time()
 
         return -1
 

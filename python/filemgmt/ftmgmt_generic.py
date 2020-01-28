@@ -1,18 +1,16 @@
-#!/usr/bin/env python
-
 # $Id: ftmgmt_generic.py 46423 2017-12-19 21:07:55Z friedel $
 # $Rev:: 46423                            $:  # Revision of last commit.
 # $LastChangedBy:: friedel                $:  # Author of last commit.
 # $LastChangedDate:: 2017-12-19 15:07:55 #$:  # Date of last commit.
 
 """
-Generic filetype management class used to do filetype specific tasks
-     such as metadata and content ingestion
+    Generic filetype management class used to do filetype specific tasks
+    such as metadata and content ingestion
 """
 
 __version__ = "$Rev: 46423 $"
 
-from collections import OrderedDict
+import collections
 import copy
 import re
 #import time
@@ -21,7 +19,7 @@ import despymisc.miscutils as miscutils
 import despydmdb.dmdb_defs as dmdbdefs
 
 
-class FtMgmtGeneric(object):
+class FtMgmtGeneric:
     """  Base/generic class for managing a filetype (get metadata, update metadata, etc) """
 
     ######################################################################
@@ -49,20 +47,19 @@ class FtMgmtGeneric(object):
             byfilename[filename] = fname
 
         #self.dbh.empty_gtt(dmdbdefs.DB_GTT_FILENAME)
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("Loading filename_gtt with: %s" % byfilename.keys())
-        self.dbh.load_filename_gtt(byfilename.keys())
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"Loading filename_gtt with: {list(byfilename.keys())}")
+        self.dbh.load_filename_gtt(list(byfilename.keys()))
 
         metadata_table = self.config['filetype_metadata'][self.filetype]['metadata_table']
 
         if metadata_table.lower() == 'genfile':
             metadata_table = 'desfile'
 
-        dbq = "select m.filename from %s m, %s g where m.filename=g.filename" % \
-                 (metadata_table, dmdbdefs.DB_GTT_FILENAME)
+        dbq = f"select m.filename from {metadata_table} m, {dmdbdefs.DB_GTT_FILENAME} g where m.filename=g.filename"
         curs = self.dbh.cursor()
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("Metadata check query: %s" % dbq)
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"Metadata check query: {dbq}")
         curs.execute(dbq)
 
         results = {}
@@ -73,23 +70,19 @@ class FtMgmtGeneric(object):
             if fname not in results:
                 results[fname] = False
 
-        #self.dbh.empty_gtt(dmdbdefs.DB_GTT_FILENAME)
-
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("Metadata check results: %s" % results)
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"Metadata check results: {results}")
         return results
 
     ######################################################################
     def has_contents_ingested(self, listfullnames):
         """ Check if file has contents ingested """
-        #starttime = time.time()
         assert isinstance(listfullnames, list)
 
         # 0 contents to ingest, so true
         results = {}
         for fname in listfullnames:
             results[fname] = True
-        #print "   HCI-gen:  %.3f" % (time.time()-starttime)
 
         return results
 
@@ -114,18 +107,17 @@ class FtMgmtGeneric(object):
     def perform_metadata_tasks(self, fullname, do_update, update_info):
         """ Read metadata from file, updating file values """
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: beg")
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print("INFO: beg")
 
         # read metadata and call any special calc functions
         metadata = self._gather_metadata_file(fullname)
 
-        #if do_update:
-        #    miscutils.fwdebug_print("WARN (%s): skipping file metadata update." % \
-                                    self.__class__.__name__)
+        if do_update:
+            miscutils.fwdebug_print(f"WARN ({self.__class__.__name__}): skipping file metadata update.")
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: end")
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print("INFO: end")
         return metadata
 
 
@@ -133,53 +125,49 @@ class FtMgmtGeneric(object):
     def _gather_metadata_file(self, fullname, **kwargs):
         """ Gather metadata for a single file """
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: beg  file=%s" % (fullname))
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"INFO: beg  file={fullname}")
 
-        metadata = OrderedDict()
+        metadata = collections.OrderedDict()
 
         metadefs = self.config['filetype_metadata'][self.filetype]
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: metadefs=%s" % (metadefs))
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"INFO: metadefs={metadefs}")
         for hdname, hddict in metadefs['hdus'].items():
             for status_sect in hddict:  # don't worry about missing here, ingest catches
                 # get value from filename
                 if 'f' in hddict[status_sect]:
-                    metakeys = hddict[status_sect]['f'].keys()
+                    metakeys = list(hddict[status_sect]['f'].keys())
                     mdata2 = self._gather_metadata_from_filename(fullname, metakeys)
                     metadata.update(mdata2)
 
                 # get value from wcl/config
                 if 'w' in hddict[status_sect]:
-                    metakeys = hddict[status_sect]['w'].keys()
+                    metakeys = list(hddict[status_sect]['w'].keys())
                     mdata2 = self._gather_metadata_from_config(fullname, metakeys)
                     metadata.update(mdata2)
 
                 # get value directly from header
                 if 'h' in hddict[status_sect]:
-                    miscutils.fwdie("ERROR (%s): cannot read values from header %s = %s" % \
-                                    (self.__class__.__name__, hdname,
-                                     hddict[status_sect]['h'].keys()), 1)
+                    miscutils.fwdie(f"ERROR ({self.__class__.__name__}): cannot read values from header {hdname} = {list(hddict[status_sect]['h'].keys())}", 1)
 
                 # calculate value from different header values(s)
                 if 'c' in hddict[status_sect]:
-                    miscutils.fwdie("ERROR (%s): cannot calculate values = %s" % \
-                                    (self.__class__.__name__, hddict[status_sect]['c'].keys()), 1)
+                    miscutils.fwdie(f"ERROR ({self.__class__.__name__}): cannot calculate values = {list(hddict[status_sect]['c'].keys())}", 1)
 
                 # copy value from 1 hdu to primary
                 if 'p' in hddict[status_sect]:
-                    miscutils.fwdie("ERROR (%s): cannot copy values between headers = %s" % \
-                                    (self.__class__.__name__, hddict[status_sect]['p'].keys()), 1)
+                    miscutils.fwdie(f"ERROR ({self.__class__.__name__}): cannot copy values between headers = {list(hddict[status_sect]['p'].keys())}", 1)
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: end")
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print("INFO: end")
         return metadata
 
 
     ######################################################################
     def _gather_metadata_from_config(self, fullname, metakeys):
         """ Get values from config """
-        metadata = OrderedDict()
+        metadata = collections.OrderedDict()
 
         for wclkey in metakeys:
             metakey = wclkey.split('.')[-1]
@@ -191,8 +179,8 @@ class FtMgmtGeneric(object):
             elif metakey == 'filetype':
                 metadata['filetype'] = self.filetype
             else:
-                #if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                #    miscutils.fwdebug_print("INFO: wclkey=%s" % (wclkey))
+                if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
+                    miscutils.fwdebug_print(f"INFO: wclkey={wclkey}")
                 (exists, val) = self.config.search(wclkey)
                 if exists:
                     metadata[metakey] = val
@@ -205,7 +193,7 @@ class FtMgmtGeneric(object):
         """ Parse filename using given filepat """
 
         if self.filepat is None:
-            raise TypeError("None filepat for filetype %s" % self.filetype)
+            raise TypeError(f"None filepat for filetype {self.filetype}")
 
         # change wcl file pattern into a pattern usable by re
         newfilepat = copy.deepcopy(self.filepat)
@@ -213,16 +201,15 @@ class FtMgmtGeneric(object):
         listvar = []
         m = re.search(varpat, newfilepat)
         while m:
-            #print m.group(1), m.group(2)
             if m.group(1) is not None:
-                m2 = re.search('([^:]+):(\d+)', m.group(1))
+                m2 = re.search(r'([^:]+):(\d+)', m.group(1))
                 #print m2.group(1), m2.group(2)
                 listvar.append(m2.group(1))
 
                 # create a pattern that will remove the 0-padding
-                newfilepat = re.sub(r"\${%s}" % (m.group(1)), '(\d{%s})' % m2.group(2), newfilepat)
+                newfilepat = re.sub(fr"\${{{m.group(1)}}}", fr'(\\d{{{m2.group(2)}}})', newfilepat)
             else:
-                newfilepat = re.sub(r"\${%s}" % (m.group(2)), '(\S+)', newfilepat)
+                newfilepat = re.sub(fr"\${{{m.group(2)}}}", r'(\\S+)', newfilepat)
                 listvar.append(m.group(2))
 
             m = re.search(varpat, newfilepat)
@@ -231,33 +218,33 @@ class FtMgmtGeneric(object):
         # now that have re pattern, parse the filename for values
         filename = miscutils.parse_fullname(fullname, miscutils.CU_PARSE_FILENAME)
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: newfilepat = %s" % newfilepat)
-        #    miscutils.fwdebug_print("INFO: filename = %s" % filename)
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"INFO: newfilepat = {newfilepat}")
+            miscutils.fwdebug_print(f"INFO: filename = {filename}")
 
         m = re.search(newfilepat, filename)
         if m is None:
-            miscutils.fwdebug_print("INFO: newfilepat = %s" % newfilepat)
-            miscutils.fwdebug_print("INFO: filename = %s" % filename)
-            raise ValueError("Pattern (%s) did not match filename (%s)" % (newfilepat, filename))
+            miscutils.fwdebug_print(f"INFO: newfilepat = {newfilepat}")
+            miscutils.fwdebug_print(f"INFO: filename = {filename}")
+            raise ValueError(f"Pattern ({newfilepat}) did not match filename ({filename})")
 
-        #if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: m.group() = %s" %  m.group())
-        #    miscutils.fwdebug_print("INFO: listvar = %s" % listvar)
+        if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"INFO: m.group() = {m.group()}")
+            miscutils.fwdebug_print(f"INFO: listvar = {listvar}")
 
         # only save values parsed from filename that were requested per metakeys
         mddict = {}
-        for cnt in range(0, len(listvar)):
-            key = listvar[cnt]
+        for cnt, val in enumerate(listvar):
+            key = val
             if key in metakeys:
-                #if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-                #    miscutils.fwdebug_print("INFO: saving as metadata key = %s, cnt = %s" % (key, cnt))
-                mddict[key] = m.group(cnt+1)
-            #elif miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-            #    miscutils.fwdebug_print("INFO: skipping key = %s because not in metakeys" % key)
+                if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
+                    miscutils.fwdebug_print(f"INFO: saving as metadata key = {key}, cnt = {cnt}")
+                mddict[key] = m.group(cnt + 1)
+            elif miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
+                miscutils.fwdebug_print(f"INFO: skipping key = {key} because not in metakeys")
 
 
-        #if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
-        #    miscutils.fwdebug_print("INFO: mddict = %s" % mddict)
+        if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
+            miscutils.fwdebug_print(f"INFO: mddict = {mddict}")
 
         return mddict

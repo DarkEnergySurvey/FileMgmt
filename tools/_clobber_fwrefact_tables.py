@@ -27,8 +27,8 @@ def empty_se_objects_table(dbh):
     print "Dropping %s partitions from SE_OBJECT" % linecnt
 
     print "You'll need to manually delete any temp tables if they exist"
-    
-    
+
+
 
 def delete_from_table(dbh, tname, user=None):
     sql = "delete from %s" % (tname)
@@ -95,7 +95,7 @@ def main(args):
     args = vars(parser.parse_args())
 
     dbh = desdmdbi.DesDmDbi()
-    
+
     if dbh.configdict['name'].lower() != 'destest':
         print "This command can only be run against the destest database."
         print "   User = '%s'" % dbh.configdict['user']
@@ -103,7 +103,7 @@ def main(args):
         print "   Section = %s" % dbh.which_services_section()
         print "   File = %s" % dbh.which_services_file()
         exit(1)
-    
+
     # delete provenance
     # OPM_ARTIFACT auto deleted when deleting from genfile
     if 'USER' in os.environ:
@@ -111,26 +111,26 @@ def main(args):
             delete_from_table(dbh, tname, os.environ['USER'])
     else:
         print "Skipping OPM tables because couldn't determine user"
-    
+
     # non-file tables
-    for tname in [ 'qc_processed_value', 'qc_processed_message', 'pfw_message', 
+    for tname in [ 'qc_processed_value', 'qc_processed_message', 'pfw_message',
         'pfw_data_query', 'pfw_attempt_label', 'pfw_attempt_val',
-        'pfw_exec', 'pfw_wrapper', 'pfw_job', 'pfw_block', 
-        'pfw_attempt', 'pfw_unit', 'pfw_request', 
-        'seminfo', 'transfer_file', 'transfer_batch', 
+        'pfw_exec', 'pfw_wrapper', 'pfw_job', 'pfw_block',
+        'pfw_attempt', 'pfw_unit', 'pfw_request',
+        'seminfo', 'transfer_file', 'transfer_batch',
         'task']:
         delete_from_table(dbh, tname)
-    
+
     empty_se_objects_table(dbh)
 
     for tname in ['catalog', 'image', 'scamp_qa', 'psf_qa']:
         delete_from_table(dbh, tname)
 
-    
+
     for ftype in ['cal_biascor', 'cal_dflatcor', 'xtalked_bias', 'xtalked_dflat']:
         delete_from_table_by_ftype(dbh, 'CALIBRATION', ftype)
-    
-    # delete output files 
+
+    # delete output files
     for ftype in ['cat_psfex','cat_satstars','cat_scamp','cat_scamp_full','cat_trailbox','head_scamp','head_scamp_full','psfex_model','qa_scamp','red_bkg','red_check','xml_psfex','xml_scamp','wcl','log','list','junk_tar']:
         delete_from_genfile_table(dbh, ftype)
 
@@ -142,12 +142,12 @@ def main(args):
 
 
     # delete entries from file "location" table for files no longer having metadata
-    #delete_from_cache_table(dbh) 
-    delete_from_file_archive_table(dbh) 
+    #delete_from_cache_table(dbh)
+    delete_from_file_archive_table(dbh)
 
-    
+
     print "Are you sure you want to delete all these rows (Y/N)? ",
-    ans = sys.stdin.read(1) 
+    ans = sys.stdin.read(1)
     if ans.lower() == 'y':
         print "Committing the deletions"
         dbh.commit()

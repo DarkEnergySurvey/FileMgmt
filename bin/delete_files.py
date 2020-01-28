@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """ Delete files from local disk and DB location tracking based upon an archive path, reqnum,
     unitname, attnum, and or pfw_attempt_id
@@ -16,7 +16,7 @@ import despydmdb.desdmdbi as desdbi
 
 
 def report(operator, archive_path, archive, files_from_disk, files_from_db, filesize, fend, pfwids=None):
-    """ Method to print information about the files to be deleted
+    """ Method to print(information about the files to be deleted
 
         Parameters
         ----------
@@ -47,18 +47,18 @@ def report(operator, archive_path, archive, files_from_disk, files_from_db, file
     """
     # if no operator is given do not report it (usually when there are multiple pfw_attempt_ids being reported)
     if operator:
-        print "  Operator = %s" % operator
+        print(f"  Operator = {operator}")
     # if no archive path is given do not report it (usually when there are multiple pfw_attempt_ids being reported)
     if archive_path:
-        print "  Path = %s" % archive_path
-    print "  Archive name = %s" % archive
-    print "  Number of files from disk = %s" % files_from_disk
-    print "  Number of files from db   = %s" % files_from_db
-    print "  Total file size on disk = %.3f %s" % (filesize, fend)
+        print(f"  Path = {archive_path}")
+    print(f"  Archive name = {archive}")
+    print(f"  Number of files from disk = {files_from_disk}")
+    print(f"  Number of files from db   = {files_from_db}")
+    print(f"  Total file size on disk = {filesize:.3f} {fend}")
     # if there is no given pfw_attempt_id do not report it (usually if there is only 1 pfw_attempt_id)
     if pfwids:
-        print "  pfw_attempt_ids: %s" % (', '.join(pfwids))
-    print '\n'
+        print(f"  pfw_attempt_ids: {', '.join(pfwids)}")
+    print('\n')
 
 def parse_and_check_cmd_line(argv):
     """ Method to parse command line arguments
@@ -104,16 +104,16 @@ The following are all valid ways to select the files:
     args = parser.parse_args(argv)
     # check for validity
     if args.relpath and (args.reqnum or args.unitname or args.attnum or args.tag or args.pfwid):
-        print "Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified."
+        print("Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified.")
         sys.exit(1)
     if args.reqnum and (args.tag or args.pfwid):
-        print "Reqnum was specified, thus tag and pfwid cannot be specified."
+        print("Reqnum was specified, thus tag and pfwid cannot be specified.")
         sys.exit(1)
     if args.tag and args.pfwid:
-        print "Tag was specified, thus pfwid cannot be specified."
+        print("Tag was specified, thus pfwid cannot be specified.")
         sys.exit(1)
     if (args.unitname or args.attnum) and not args.reqnum:
-        print "Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again."
+        print("Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again.")
         sys.exit(1)
     return args
 
@@ -125,9 +125,9 @@ def gather_data(dbh, args):
     if args.relpath:
         # make sure relpath is not an absolute path
         if args.relpath[0] == '/':
-            print "Error: relpath is an absolute path  (%s)." % args.relpath[0]
-            print "\tIt should be the portion of the path after the archive root."
-            print "\tAborting"
+            print(f"Error: relpath is an absolute path  ({args.relpath[0]})")
+            print("\tIt should be the portion of the path after the archive root.")
+            print("\tAborting")
             sys.exit(1)
 
         archive_root, archive_path, state, operator, pfwid = dbutils.get_paths_by_path(dbh, args)
@@ -138,32 +138,31 @@ def gather_data(dbh, args):
     elif args.pfwid:
         archive_root, archive_path, relpath, state, operator, pfwid = dbutils.get_paths_by_id(dbh, args)
     else:
-        print "Either relpath, pfw_attempt_id, or a reqnum/unitname/attnum triplet must be specified."
+        print("Either relpath, pfw_attempt_id, or a reqnum/unitname/attnum triplet must be specified.")
         sys.exit(1)
-    
+
     # if relpath is None the just abort gracefully
     if not relpath:
         return None, None, None, None, None, pfwid, None
     # make sure path is at least 3 directories longer than archive_root
     subdirs = relpath.strip('/').split('/')  # remove any trailing / first
     if len(subdirs) < 3:
-        print "Suspect relpath is too high up in archive (deleting too much)."
-        print "\tCheck relpath is accurate.   If actually want to delete all that,"
-        print "\tcall program on smaller chunks"
-        print "\tAborting"
+        print("Suspect relpath is too high up in archive (deleting too much).")
+        print("\tCheck relpath is accurate.   If actually want to delete all that,")
+        print("\tcall program on smaller chunks")
+        print("\tAborting")
         sys.exit(1)
 
     # check path is path exists on disk, but ignore if this is part of a tag
-    path = "%s/%s" % (archive_root, relpath)
+    path = f"{archive_root}/{relpath}"
     if not os.path.exists(path) and not args.tag:
-        print " Path does not exist on disk:  %s" % (path)
-        #print "\tSkipping pfw_attempt_id %s" % (pfwid)
+        print(f" Path does not exist on disk:  {path}")
         return None, None, None, None, None, pfwid, None
 
     return archive_root, archive_path, relpath, state, operator, pfwid, part
 
 def print_info(comparison_info, pfwids, key):
-    """ Method to print out files for a specific collecion (dbonly, diskonly, both)
+    """ Method to print(out files for a specific collecion (dbonly, diskonly, both)
 
         Parameters
         ----------
@@ -179,16 +178,16 @@ def print_info(comparison_info, pfwids, key):
             The key whose data are being printed
 
     """
-    # only print out the header if there is more than 1 pfw_attempt_id
+    # only print(out the header if there is more than 1 pfw_attempt_id
     if pfwids[0]:
-        print "PFW_ATT_ID     File"
+        print("PFW_ATT_ID     File")
     for pid in pfwids:
         for filename in comparison_info[pid][key]:
             if comparison_info[pid]['pfwid']:
-                print "  %s     %s" % (comparison_info[pid]['pfwid'], filename)
+                print(f"  {comparison_info[pid]['pfwid']}     {filename}")
             else:
-                print "    %s" % (filename)
-    print '\n'
+                print(f"    {filename}")
+    print('\n')
 
 def get_counts(comparison_info):
     """ Method to get the number of files only found in the Db and only found on disk
@@ -212,7 +211,7 @@ def get_counts(comparison_info):
     return onlydb, onlydisk
 
 def print_files(comparison_info):
-    """ Method to print all found files, separated by where they were found (both disk and DB,
+    """ Method to print(all found files, separated by where they were found (both disk and DB,
         disk only, DB only)
 
         Parameters
@@ -222,27 +221,27 @@ def print_files(comparison_info):
     """
 
     onlydb, onlydisk = get_counts(comparison_info)
-    print "\nFiles in both database and on disk:\n"
-    pfwids = comparison_info.keys()
-    # print out all files found both on disk and in the DB
+    print("\nFiles in both database and on disk:\n")
+    pfwids = list(comparison_info.keys())
+    # print(out all files found both on disk and in the DB
     print_info(comparison_info, pfwids, 'both')
 
     # report any files only found in the DB
-    print " Files only found in database:\n"
+    print(" Files only found in database:\n")
     if onlydb == 0:
-        print "   None\n\n"
+        print("   None\n\n")
     else:
         print_info(comparison_info, pfwids, 'dbonly')
 
     # report any files only found on disk
-    print " Files only found on disk:\n"
+    print(" Files only found on disk:\n")
     if onlydisk == 0:
-        print "   None\n\n"
+        print("   None\n\n")
     else:
         print_info(comparison_info, pfwids, 'diskonly')
 
 def diff_files(comparison_info):
-    """ Method to print out the differences between files found on disk and found in the DB
+    """ Method to print(out the differences between files found on disk and found in the DB
 
         Parameters
         ----------
@@ -254,19 +253,19 @@ def diff_files(comparison_info):
 
     # if there are no files only found on disk or only found in the DB
     if onlydb == onlydisk == 0:
-        print "\n No differneces found\n"
+        print("\n No differneces found\n")
         return
-    pfwids = comparison_info.keys()
+    pfwids = list(comparison_info.keys())
     # report any files only found in the DB
-    print "\n Files only found in database:\n"
+    print("\n Files only found in database:\n")
     if onlydb == 0:
-        print "None\n\n"
+        print("None\n\n")
     else:
         print_info(comparison_info, pfwids, 'dbonly')
-    print " Files only found on disk:\n"
+    print(" Files only found on disk:\n")
     # report any files only found on disk
     if onlydisk == 0:
-        print "None\n\n"
+        print("None\n\n")
     else:
         print_info(comparison_info, pfwids, 'diskonly')
 
@@ -290,15 +289,14 @@ def get_size_unit(filesize):
     if filesize >= fmdef.TB:
         filesize /= fmdef.TB
         return filesize, "Tb"
-    elif filesize >= fmdef.GB:
+    if filesize >= fmdef.GB:
         filesize /= fmdef.GB
         return filesize, "Gb"
-    elif filesize >= fmdef.MB:
+    if filesize >= fmdef.MB:
         filesize /= fmdef.MB
         return filesize, "Mb"
-    else:
-        filesize /= fmdef.KB
-        return filesize, "kb"
+    filesize /= fmdef.KB
+    return filesize, "kb"
 
 def main():
     """ Main control """
@@ -308,10 +306,10 @@ def main():
     # get all pfw_attempt_ids for the given tag
     if args.tag:
         if not args.filetype:
-            print 'WARNING, specifying a tag without a filetype will delete all data from the tag.'
-            should_continue = raw_input("Please verify you want to do this [yes/no]: ")
+            print('WARNING, specifying a tag without a filetype will delete all data from the tag.')
+            should_continue = input("Please verify you want to do this [yes/no]: ")
             shdelchar = should_continue[0].lower()
-            if shdelchar == 'y' or shdelchar == 'yes':
+            if shdelchar in ['y', 'yes']:
                 pass
             else:
                 sys.exit(0)
@@ -333,14 +331,14 @@ def main():
         args.pfwid = pid
         archive_root, archive_path, relpath, state, operator, pfwid, part = gather_data(dbh, args)
         if not archive_root and not relpath:
-            print '    Skipping pfw_attempt_id %s.' % (pfwid)
+            print(f"    Skipping pfw_attempt_id {pfwid}.")
             continue
         files_from_disk, dup = diskutils.get_files_from_disk(relpath, archive_root)
         files_from_db, dup = dbutils.get_files_from_db(dbh, relpath, args.archive, pfwid, args.filetype)
         # if filetype is set then trim down the disk results
         if args.filetype is not None:
             newfiles = {}
-            for filename, val in files_from_db.iteritems():
+            for filename, val in files_from_db.items():
                 if filename in files_from_disk:
                     newfiles[filename] = files_from_disk[filename]
             files_from_disk = newfiles
@@ -360,8 +358,8 @@ def main():
                                                 'files_from_db': files_from_db,
                                                 'comparison_info': comparison_info})
 
-    if len(all_data) == 0:
-        print "Nothing to do"
+    if not all_data:
+        print("Nothing to do")
         sys.exit(0)
     filesize = 0.0
     bad_filesize = 0.0
@@ -375,19 +373,19 @@ def main():
     for data in all_data.values():
         # if the data is not junk and no filetype was specified then it cannot be deleted
         if data.state != 'JUNK' and args.filetype is None:
-            for filename, val in data.files_from_disk.iteritems():
-                #print filename,val
+            for filename, val in data.files_from_disk.items():
+                #print(filename,val
                 bad_filesize += val['filesize']
             bad_pfwids.append(str(data.pfwid))
             bad_ffdb += len(data.files_from_db)
             bad_ffd += len(data.files_from_disk)
         else:
-            for filename, val in data.files_from_disk.iteritems():
-                #print filename,val
+            for filename, val in data.files_from_disk.items():
+                #print(filename,val
                 filesize += val['filesize']
             ffdb += len(data.files_from_db)
             ffd += len(data.files_from_disk)
-            if len(data.files_from_db) == len(data.files_from_disk) == 0:
+            if not data.files_from_db and not data.files_from_disk:
                 empty_pfwids.append(data.pfwid)
     for pid in empty_pfwids:
         del all_data[pid]
@@ -398,17 +396,17 @@ def main():
     bad_filesize, bfend = get_size_unit(bad_filesize)
 
     # report the results of what was found
-    if len(files_from_db) == 0:
-        print "\nNo files in database to delete."
+    if not files_from_db:
+        print("\nNo files in database to delete.")
         sys.exit(0)
-    if len(files_from_disk) == 0:
-        print "\nNo files on disk to delete."
+    if not files_from_disk:
+        print("\nNo files on disk to delete.")
         sys.exit(0)
 
-    if len(bad_pfwids) > 0:
-        print "\nThe following data cannot be deleted as the associated attempts have not been marked as 'JUNK' (ATTEMPT_STATE.DATA_STATE):"
+    if bad_pfwids:
+        print("\nThe following data cannot be deleted as the associated attempts have not been marked as 'JUNK' (ATTEMPT_STATE.DATA_STATE):")
         if len(bad_pfwids) == 1:
-            pid = all_data.keys()[0]
+            pid = list(all_data.keys())[0]
             operator = all_data[pid].operator
             archive_path = all_data[pid].archive_path
         else:
@@ -416,21 +414,21 @@ def main():
             archive_path = None
         report(operator, archive_path, args.archive, bad_ffdb, bad_ffd, bad_filesize, bfend, bad_pfwids)
         if len(bad_pfwids) == len(all_data):
-            print " No data to delete\n"
+            print(" No data to delete\n")
             sys.exit(1)
     for bpid in bad_pfwids:
         del all_data[int(bpid)]
         del merged_comparison_info[int(bpid)]
 
     if len(all_data) == 1:
-        pid = all_data.keys()[0]
+        pid = list(all_data.keys())[0]
         operator = all_data[pid].operator
         archive_path = all_data[pid].archive_path
     else:
         operator = None
         archive_path = None
-    if len(bad_pfwids) > 0:
-        print '\nFiles that can be deleted'
+    if bad_pfwids:
+        print('\nFiles that can be deleted')
 
     report(operator, archive_path, args.archive, ffdb, ffd, filesize, fend)
 
@@ -438,26 +436,26 @@ def main():
         sys.exit(0)
 
     shdelchar = 'x'
-    while shdelchar != 'n' and shdelchar != 'y':
-        print ""
+    while shdelchar not in ['n', 'y']:
+        print("")
         # query if we should proceed
-        should_delete = raw_input("Do you wish to continue with deletion [yes/no/diff/print]?  ")
+        should_delete = input("Do you wish to continue with deletion [yes/no/diff/print]?  ")
         shdelchar = should_delete[0].lower()
 
-        if shdelchar == 'p' or shdelchar == 'print':
+        if shdelchar in ['p', 'print']:
             print_files(merged_comparison_info)
 
-        elif shdelchar == 'd' or shdelchar == 'diff':
+        elif shdelchar in ['d', 'diff']:
             diff_files(merged_comparison_info)
 
-        elif shdelchar == 'y' or shdelchar == 'yes':
+        elif shdelchar in ['y', 'yes']:
             # loop over each pfwid
             for data in all_data.values():
                 # if deleting specific files
                 if data.dofiles:
                     good = diskutils.del_part_files_from_disk(data.files_from_db, data.archive_root)
                     if len(good) != len(data.files_from_db):
-                        print "Warning, not all files on disk could be deleted. Only removing the deleted ones from the database."
+                        print("Warning, not all files on disk could be deleted. Only removing the deleted ones from the database.")
                     dbutils.del_part_files_from_db(dbh, good)
                     # check to see if this is the last of the files in the attempt
                     if dbutils.get_file_count_by_pfwid(dbh, data.pfwid) != 0:
@@ -468,17 +466,17 @@ def main():
                     try:
                         diskutils.del_files_from_disk(data.archive_path)
                     except Exception as exept:
-                        print "Error encountered when deleting files: ", str(exept)
-                        print "Aborting"
+                        print("Error encountered when deleting files: ", str(exept))
+                        print("Aborting")
                         raise
                     errfls = {}
                     for (dirpath, _, filenames) in os.walk(os.path.join(data.archive_root, data.relpath)):
                         for filename in filenames:
                             errfls[filename] = dirpath
-                    if len(errfls) > 0:
+                    if errfls:
                         delfiles = []
                         depth = 'PRUNED'
-                        for filename, val in data.files_from_disk.iteritems():
+                        for filename, val in data.files_from_disk.items():
                             if filename not in errfls:
                                 delfiles.append((filename))
                         dbutils.del_part_files_from_db_by_name(dbh, data.relpath, args.archive, delfiles)
@@ -486,10 +484,10 @@ def main():
                         depth = 'PURGED'
                         dbutils.del_files_from_db(dbh, data.relpath, args.archive)
                 dbutils.update_attempt_state(dbh, depth, data.pfwid)
-        elif shdelchar == 'n' or shdelchar == 'no':
-            print "Exiting."
+        elif shdelchar in ['n', 'no']:
+            print("Exiting.")
         else:
-            print "Unknown input (%s).   Ignoring" % shdelchar
+            print(f"Unknown input ({shdelchar}).   Ignoring")
 
 if __name__ == "__main__":
     main()

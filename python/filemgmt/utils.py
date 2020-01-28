@@ -3,13 +3,14 @@
 # $LastChangedBy:: friedel                $:  # Author of last commit.
 # $LastChangedDate:: 2019-05-20 14:27:44 #$:  # Date of last commit.
 
-import despymisc.miscutils as miscutils
 import os
 import subprocess
-from stat import S_IMODE, S_ISDIR
 import pwd
 import grp
 import datetime
+from stat import S_IMODE, S_ISDIR
+
+import despymisc.miscutils as miscutils
 
 CHUNK = 1024.
 UNITS = {0 : 'b',
@@ -32,15 +33,15 @@ def get_config_vals(archive_info, config, keylist):
             info[k] = config[k]
         elif st.lower() == 'req':
             miscutils.fwdebug(0, 'FMUTILS_DEBUG', '******************************')
-            miscutils.fwdebug(0, 'FMUTILS_DEBUG', 'keylist = %s' % keylist)
-            miscutils.fwdebug(0, 'FMUTILS_DEBUG', 'archive_info = %s' % archive_info)
-            miscutils.fwdebug(0, 'FMUTILS_DEBUG', 'config = %s' % config)
-            miscutils.fwdie('Error: Could not find required key (%s)' % k, 1, 2)
+            miscutils.fwdebug(0, 'FMUTILS_DEBUG', f'keylist = {keylist}')
+            miscutils.fwdebug(0, 'FMUTILS_DEBUG', f'archive_info = {archive_info}')
+            miscutils.fwdebug(0, 'FMUTILS_DEBUG', f'config = {config}')
+            miscutils.fwdie(f'Error: Could not find required key ({k})', 1, 2)
     return info
 
 
 def convert_permissions(perm):
-    if isinstance(perm, (int, long)):
+    if isinstance(perm, int):
         perm = str(perm)
     lead = 0
     output = ''
@@ -93,9 +94,13 @@ def ls_ld(fname):
         else:
             fmt = '%b %d %H:%M'
         timestamp = ctime.strftime(fmt)
-        return "%s  %s %s %-12s %-13s %s" % (perm, user, group, str(st.st_size), timestamp, fname)
+        return f"{perm}  {user} {group} {str(st.st_size):-12s} {timestamp:-13s} {fname}"
     except:
-        stat = subprocess.Popen('pwd; ls -ld %s' % (fname), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stat = subprocess.Popen(f'pwd; ls -ld {fname}',
+                                shell=True,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True)
         stdout = stat.communicate()[0]
         return stdout
 
@@ -103,30 +108,31 @@ def ls_ld(fname):
 def find_ls(base):
     for root, dirs, files in os.walk(base):
         for d in dirs:
-            print ls_ld(os.path.join(root, d))
+            print(ls_ld(os.path.join(root, d)))
         for f in files:
-            print ls_ld(os.path.join(root, f))
+            print(ls_ld(os.path.join(root, f)))
 
 
 def get_mount_point(pathname):
     "Get the mount point of the filesystem containing pathname"
-    pathname= os.path.normcase(os.path.realpath(pathname))
-    parent_device= path_device= os.stat(pathname).st_dev
+    pathname = os.path.normcase(os.path.realpath(pathname))
+    parent_device = path_device = os.stat(pathname).st_dev
     while parent_device == path_device:
-        mount_point= pathname
-        pathname= os.path.dirname(pathname)
-        if pathname == mount_point: break
-        parent_device= os.stat(pathname).st_dev
+        mount_point = pathname
+        pathname = os.path.dirname(pathname)
+        if pathname == mount_point:
+            break
+        parent_device = os.stat(pathname).st_dev
     return mount_point
 
 def get_mounted_device(pathname):
     "Get the device mounted at pathname"
     # uses "/proc/mounts"
-    pathname= os.path.normcase(pathname) # might be unnecessary here
+    pathname = os.path.normcase(pathname) # might be unnecessary here
     try:
         with open("/proc/mounts", "r") as ifp:
             for line in ifp:
-                fields= line.rstrip('\n').split()
+                fields = line.rstrip('\n').split()
                 # note that line above assumes that
                 # no mount points contain whitespace
                 if fields[1] == pathname:
@@ -140,11 +146,11 @@ def reduce(size):
     while size > CHUNK:
         size /= CHUNK
         count += 1
-    return "%i%s" % (int(size), UNITS[count])
+    return f"{int(size):d}{UNITS[count]}"
 
 def get_fs_space(pathname):
     "Get the free space of the filesystem containing pathname"
-    stat= os.statvfs(pathname)
+    stat = os.statvfs(pathname)
     # use f_bfree for superuser, or f_bavail if filesystem
     # has reserved space for superuser
     free = stat.f_bfree * stat.f_bsize
@@ -157,5 +163,5 @@ def df_h(path):
     dev = get_mounted_device(mount)
     total, free, used = get_fs_space(path)
     percent = int(100. * used/total)
-    print 'Filesystem      Size   Used   Avail  Use%  Mounted on'
-    print '%-15s %s   %s   %s   %i%%   %s' % (dev, reduce(total), reduce(used), reduce(free), percent, mount)
+    print("Filesystem2      Size   Used   Avail  Use%  Mounted on")
+    print(f"{dev:-15s} {reduce(total)}   {reduce(used)}   {reduce(free)}   {percent:d}%   {mount}")

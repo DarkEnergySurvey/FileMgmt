@@ -5,9 +5,9 @@
 
 """ Miscellaneous FileMgmt utils """
 
+import json
 import despymisc.miscutils as miscutils
 import despymisc.misctime as misctime
-import json
 
 
 ##################################################################################################
@@ -21,10 +21,10 @@ def get_config_vals(archive_info, config, keylist):
             info[k] = config[k]
         elif stat.lower() == 'req':
             miscutils.fwdebug_print('******************************')
-            miscutils.fwdebug_print('keylist = %s' % keylist)
-            miscutils.fwdebug_print('archive_info = %s' % archive_info)
-            miscutils.fwdebug_print('config = %s' % config)
-            miscutils.fwdie('Error: Could not find required key (%s)' % k, 1, 2)
+            miscutils.fwdebug_print(f'keylist = {keylist}')
+            miscutils.fwdebug_print(f'archive_info = {archive_info}')
+            miscutils.fwdebug_print(f'config = {config}')
+            miscutils.fwdie(f'Error: Could not find required key ({k})', 1, 2)
     return info
 
 ######################################################################
@@ -32,12 +32,11 @@ def read_json_single(json_file, allMandatoryExposureKeys):
     """ Reads json manifest file """
 
     if miscutils.fwdebug_check(3, 'FMUTILS_DEBUG'):
-        miscutils.fwdebug_print("reading file %s" % json_file)
+        miscutils.fwdebug_print(f"reading file {json_file}")
 
     allExposures = []
 
     my_header = {}
-    numseq = {}
     all_exposures = dict()
     with open(json_file) as my_json:
         for line in my_json:
@@ -53,7 +52,7 @@ def read_json_single(json_file, allMandatoryExposureKeys):
 
                 if key == 'exposures':
                     if miscutils.fwdebug_check(6, 'FMUTILS_DEBUG'):
-                        miscutils.fwdebug_print("line = exposures = %s" % value)
+                        miscutils.fwdebug_print(f"line = exposures = {value}")
                     #read all the exposures that were taken for the set_type in header
                     my_header = value
 
@@ -65,14 +64,13 @@ def read_json_single(json_file, allMandatoryExposureKeys):
 
                     for i in range(tot_exposures):
                         if miscutils.fwdebug_check(3, 'FMUTILS_DEBUG'):
-                            miscutils.fwdebug_print("Working on exposure %s" % (i))
-                            miscutils.fwdebug_print("\texpid = %s" % my_header[i]['expid'])
-                            miscutils.fwdebug_print("\tdate = %s" % my_header[i]['date'])
-                            miscutils.fwdebug_print("\tacttime = %s" % my_header[i]['acttime'])
+                            miscutils.fwdebug_print(f"Working on exposure {i}")
+                            miscutils.fwdebug_print(f"\texpid = {my_header[i]['expid']}")
+                            miscutils.fwdebug_print(f"\tdate = {my_header[i]['date']}")
+                            miscutils.fwdebug_print(f"\tacttime = {my_header[i]['acttime']}")
                         if miscutils.fwdebug_check(6, 'FMUTILS_DEBUG'):
-                            miscutils.fwdebug_print("Entire exposure %s = %s" % (i, my_header[i]))
+                            miscutils.fwdebug_print(f"Entire exposure {i} = {my_header[i]}")
 
-                        numseq = my_header[i]['sequence']
                         mytime = my_header[i]['acttime']
                         #if mytime > 10 and numseq['seqnum'] == 2:
                         #    first_expnum = my_header[i]['expid']
@@ -84,17 +82,14 @@ def read_json_single(json_file, allMandatoryExposureKeys):
                         try:
                             for mandatoryExposureKey in allMandatoryExposureKeys:
                                 if miscutils.fwdebug_check(3, 'FMUTILS_DEBUG'):
-                                    miscutils.fwdebug_print("mandatory key %s" % \
-                                                            mandatoryExposureKey)
+                                    miscutils.fwdebug_print(f"mandatory key {mandatoryExposureKey}")
                                 key = str(mandatoryExposureKey)
 
                                 if my_header[i][mandatoryExposureKey]:
                                     if miscutils.fwdebug_check(3, 'FMUTILS_DEBUG'):
-                                        miscutils.fwdebug_print("mandatory key '%s' found %s" % \
-                                                                (mandatoryExposureKey,
-                                                                 my_header[i][mandatoryExposureKey]))
+                                        miscutils.fwdebug_print(f"mandatory key '{mandatoryExposureKey}' found {my_header[i][mandatoryExposureKey]}")
                                     if miscutils.fwdebug_check(6, 'FMUTILS_DEBUG'):
-                                        miscutils.fwdebug_print("allExposures in for: %s" % allExposures)
+                                        miscutils.fwdebug_print(f"allExposures in for: {allExposures}")
 
                                     try:
                                         if key == 'acttime':
@@ -113,11 +108,10 @@ def read_json_single(json_file, allMandatoryExposureKeys):
 
 
                         except KeyError:
-                            miscutils.fwdebug_print("Error: missing key '%s' in json entity: %s " % \
-                                                    (mandatoryExposureKey, my_header[i]))
+                            miscutils.fwdebug_print(f"Error: missing key '{mandatoryExposureKey}' in json entity: {my_header[i]} ")
                             raise
 
-                    if len(all_exposures) == 0:
+                    if not all_exposures:
                         raise ValueError("Found 0 non-pointing exposures in manifest file")
 
                     timestamp = all_exposures['date'][0]
@@ -134,7 +128,7 @@ def read_json_single(json_file, allMandatoryExposureKeys):
                     camsym = 'D'   # no way to currently tell CAMSYM/INSTRUME from manifest file
 
                     if not newfield.startswith('SN-'):
-                        raise ValueError("Invalid field (%s).  set_type = '%s'" % (newfield, my_head['set_type']))
+                        raise ValueError(f"Invalid field ({newfield}).  set_type = '{my_head['set_type']}'")
 
                     #if json_file contains a path or compression extension, then cut it to only the filename
                     jsonfile = miscutils.parse_fullname(json_file, miscutils.CU_PARSE_FILENAME)
@@ -165,18 +159,18 @@ def read_json_single(json_file, allMandatoryExposureKeys):
     # Add the manifest filename value in the dictionary
     #all_exposures['MANIFEST_FILENAME'] = json_file
     if miscutils.fwdebug_check(6, 'FMUTILS_DEBUG'):
-        miscutils.fwdebug_print("allExposures " % (all_exposures))
+        miscutils.fwdebug_print("allExposures " + all_exposures)
 
     return all_exposures
 
 ##################################################################################################
 
-class DataObject(object):
+class DataObject:
     """ Class to turn a dictionary into class elements
 
     """
     def __init__(self, **kw):
-        for item, val in kw.iteritems():
+        for item, val in kw.items():
             setattr(self, item, val)
 
     def get(self, attrib):
@@ -207,5 +201,5 @@ class DataObject(object):
 
         """
         if not hasattr(self, attrib):
-            raise Exception("%s is not a member of DataObject." % (attrib))
+            raise Exception(f"{attrib} is not a member of DataObject.")
         setattr(self, attrib, value)

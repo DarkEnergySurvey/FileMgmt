@@ -3,9 +3,9 @@ envPrepend(PATH, ${PRODUCT_DIR}/tools)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
 
 setupRequired(despyDMdb)
+setupRequired(despymisc)
 setupRequired(IntegrationUtils)
 setupRequired(DatabaseApps)
-setupRequired(deswebdav)
-
-# only if using globus online transfers
-#setupRequired(globusonline)
+setupRequired(astropy)
+setupRequired(despyfitsutils)
+setupRequired(despyServiceAccess)
