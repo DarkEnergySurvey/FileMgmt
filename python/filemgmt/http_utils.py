@@ -1,21 +1,14 @@
-# $Id: disk_utils_local.py 18486 2014-01-29 15:58:12Z mgower $
-# $Rev:: 18486                            $:  # Revision of last commit.
-# $LastChangedBy:: mgower                 $:  # Author of last commit.
-# $LastChangedDate:: 2014-01-29 09:58:12 #$:  # Date of last commit.
-
 """
 Routines for performing tasks on files available through http.
 """
 
-__version__ = "$Rev: 18486 $"
-
 import os
 import sys
-#sys.path.append('/home/friedel/.local/lib/python2.7/site-packages')
 import subprocess
 import re
 import traceback
 import time
+import certifi
 import pycurl
 
 import despyserviceaccess.serviceaccess as serviceaccess
@@ -86,6 +79,8 @@ class HttpUtils:
         >>> C.check_url("hello")
         ('hello', False)"""
         if re.match("^https?:", P):
+            if re.match(r"^https:", P):
+                self.curl.setopt(pycurl.CAINFO, certifi.where())
             return (P, True)
         return (P, False)
 
@@ -226,7 +221,7 @@ class HttpUtils:
 
         """
         # Making bar/ sometimes returns a 301 status even if there doesn't seem to be a bar/ in the directory.
-        m = re.match(r"(http://[^/]+)(/.*)", f)
+        m = re.match(r"(https?://[^/]+)(/.*)", f)
         self.curl.setopt(pycurl.CUSTOMREQUEST, 'MKCOL')
         self.curl.setopt(pycurl.WRITEFUNCTION, lambda x: None)
         for x in miscutils.get_list_directories([m.group(2)]):
