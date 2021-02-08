@@ -34,19 +34,19 @@ class FtMgmtGenFits(FtMgmtGeneric):
             miscutils.fwdebug_print("INFO: beg")
 
         # open file
-        if do_update:
-            hdulist = fits.open(fullname, 'update')
-        else:
-            hdulist = fits.open(fullname)
+        hdulist = fits.open(fullname)
+
         # read metadata and call any special calc functions
         metadata, datadefs = self._gather_metadata_file(fullname, hdulist=hdulist)
+        hdulist.close()
+
         if miscutils.fwdebug_check(6, 'FTMGMT_DEBUG'):
             miscutils.fwdebug_print(f"INFO: file={fullname}")
         # call function to update headers
         if do_update:
+            hdulist = fits.open(fullname, 'update')
             self._update_headers_file(hdulist, metadata, datadefs, update_info)
-        # close file
-        hdulist.close()
+            hdulist.close()
 
         if miscutils.fwdebug_check(3, 'FTMGMT_DEBUG'):
             miscutils.fwdebug_print("INFO: end")
