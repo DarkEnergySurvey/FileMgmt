@@ -66,14 +66,14 @@ def convert_permissions(perm):
             output += '-'
     if lead == 2:
         if output[5] == 'x':
-            output[5] = 's'
+            output = output[:5] + 's' + output[6:]
         else:
-            output[5] = 'S'
+            output = output[:5] + 'S' + output[6:]
     elif lead == 4:
         if output[2] == 'x':
-            output[2] = 's'
+            output = output[:2] + 's' + output[3:]
         else:
-            output[2] = 'S'
+            output = output[:2] + 'S' + output[3:]
     return output
 
 
