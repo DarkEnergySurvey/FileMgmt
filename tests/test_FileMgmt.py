@@ -47,7 +47,31 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(conf["taskid"], info["taskid"])
         self.assertEqual(len(info), 3)
 
+    def test_convert_permissions(self):
+        self.assertEqual(utils.convert_permissions(777), 'rwxrwxrwx')
+        self.assertEqual(utils.convert_permissions(4444), 'r-Sr--r--')
+        self.assertEqual(utils.convert_permissions(4777), 'rwsrwxrwx')
+        self.assertEqual(utils.convert_permissions(2424), 'r---wSr--')
+        self.assertEqual(utils.convert_permissions('2777'), 'rwxrwsrwx')
+        self.assertEqual(utils.convert_permissions('024'), '----w-r--')
 
+    def test_ls_ld(self):
+        res = utils.ls_ld('junk')
+        self.assertTrue('FileMgmt' in res)
+        self.assertTrue('/' in res)
 
+        os.mkdir('test12345')
+        self.assertTrue('test12345' in utils.ls_ld('test12345'))
+        os.rmdir('test12345')
+        with open('testf1234', 'w') as fh:
+            fh.write('12345\n')
+        self.assertTrue('testf1234' in utils.ls_ld('testf1234'))
+        os.remove('testf1234')
+
+    def test_find_ls(self):
+        with capture_output() as (out, _):
+            utils.find_ls('tests')
+            output = out.getvalue().strip()
+            self.assertTrue('tests/test_FileMgmt.py' in output)
 if __name__ == '__main__':
     unittest.main()
