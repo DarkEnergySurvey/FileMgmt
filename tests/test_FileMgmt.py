@@ -73,5 +73,34 @@ class TestUtils(unittest.TestCase):
             utils.find_ls('tests')
             output = out.getvalue().strip()
             self.assertTrue('tests/test_FileMgmt.py' in output)
+
+    def test_get_mount_point(self):
+        res = utils.get_mount_point(os.getcwd())
+        self.assertTrue(res.startswith('/'))
+        self.assertTrue(res.count('/') == 1)
+
+    def test_get_mounted_device(self):
+        self.assertIsNone(utils.get_mounted_device(os.getcwd()))
+        self.assertIsNotNone(utils.get_mounted_device(utils.get_mount_point(os.getcwd())))
+
+    def test_reduce(self):
+        self.assertEqual(utils.reduce(1023), '1023b')
+        self.assertEqual(utils.reduce(1024), '1k')
+        self.assertEqual(utils.reduce(1900), '1k')
+        self.assertEqual(utils.reduce(10 * 1024 * 1024), '10M')
+        self.assertEqual(utils.reduce(5 * 1024 * 1024 * 1024 * 1024), '5T')
+
+    def test_getfs_space(self):
+        tot, free, used = utils.get_fs_space(os.getcwd())
+        self.assertTrue(tot > 0)
+        self.assertTrue(free > 0)
+        self.assertTrue(used > 0)
+
+    def test_df_h(self):
+        with capture_output() as (out, _):
+            utils.df_h(os.getcwd())
+            output = out.getvalue().strip()
+            self.assertTrue('Filesystem' in output)
+
 if __name__ == '__main__':
     unittest.main()
