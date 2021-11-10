@@ -41,8 +41,12 @@ def get_config_vals(archive_info, config, keylist):
 
 
 def convert_permissions(perm):
+    """ Convert file permissions from numeric/octal to text based
+    """
     if isinstance(perm, int):
         perm = str(perm)
+    elif 'o' in perm and 'o' == perm[1]:
+        perm = perm[0] + perm[2:]
     lead = 0
     output = ''
     if len(perm) == 4:
@@ -78,6 +82,8 @@ def convert_permissions(perm):
 
 
 def ls_ld(fname):
+    """ Get information about a file or directory as 'ls -ld' does on the command line.
+    """
     try:
         st = os.stat(fname)
         info = pwd.getpwuid(st.st_uid)
@@ -94,7 +100,7 @@ def ls_ld(fname):
         else:
             fmt = '%b %d %H:%M'
         timestamp = ctime.strftime(fmt)
-        return f"{perm}  {user} {group} {str(st.st_size):-12s} {timestamp:-13s} {fname}"
+        return f"{perm}  {user} {group} {str(st.st_size):>12s} {timestamp:>13s} {fname}"
     except:
         stat = subprocess.Popen(f'pwd; ls -ld {fname}',
                                 shell=True,
@@ -106,6 +112,8 @@ def ls_ld(fname):
 
 
 def find_ls(base):
+    """ Get info on the filesystem as 'find .' does from the command line.
+    """
     for root, dirs, files in os.walk(base):
         for d in dirs:
             print(ls_ld(os.path.join(root, d)))
@@ -114,7 +122,8 @@ def find_ls(base):
 
 
 def get_mount_point(pathname):
-    "Get the mount point of the filesystem containing pathname"
+    """Get the mount point of the filesystem containing pathname
+    """
     pathname = os.path.normcase(os.path.realpath(pathname))
     parent_device = path_device = os.stat(pathname).st_dev
     while parent_device == path_device:
@@ -126,7 +135,8 @@ def get_mount_point(pathname):
     return mount_point
 
 def get_mounted_device(pathname):
-    "Get the device mounted at pathname"
+    """ Get the device mounted at pathname
+    """
     # uses "/proc/mounts"
     pathname = os.path.normcase(pathname) # might be unnecessary here
     try:
@@ -142,14 +152,17 @@ def get_mounted_device(pathname):
     return None # explicit
 
 def reduce(size):
+    """ Reduce a file size from bytes to Kb, Mb, Gb, Tb, etc.
+    """
     count = 0
-    while size > CHUNK:
+    while size >= CHUNK:
         size /= CHUNK
         count += 1
     return f"{int(size):d}{UNITS[count]}"
 
 def get_fs_space(pathname):
-    "Get the free space of the filesystem containing pathname"
+    """ Get the free space of the filesystem containing pathname
+    """
     stat = os.statvfs(pathname)
     # use f_bfree for superuser, or f_bavail if filesystem
     # has reserved space for superuser
@@ -159,9 +172,11 @@ def get_fs_space(pathname):
     return total, free, used
 
 def df_h(path):
+    """ Get info like 'df -h' does from the command line.
+    """
     mount = get_mount_point(path)
     dev = get_mounted_device(mount)
     total, free, used = get_fs_space(path)
     percent = int(100. * used/total)
     print("Filesystem2      Size   Used   Avail  Use%  Mounted on")
-    print(f"{dev:-15s} {reduce(total)}   {reduce(used)}   {reduce(free)}   {percent:d}%   {mount}")
+    print(f"{dev:>15s} {reduce(total)}   {reduce(used)}   {reduce(free)}   {percent:d}%   {mount}")
