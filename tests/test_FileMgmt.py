@@ -11,6 +11,7 @@ from io import StringIO
 from MockDBI import MockConnection
 
 import filemgmt.utils as utils
+import filemgmt.disk_utils_local as dul
 
 @contextmanager
 def capture_output():
@@ -101,6 +102,97 @@ class TestUtils(unittest.TestCase):
             utils.df_h(os.getcwd())
             output = out.getvalue().strip()
             self.assertTrue('Filesystem' in output)
+
+class Testdisk_utils_local(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.mkdir('tester')
+        cls.fname = ['testf1234.test',
+                     'testf45678.test.gz',
+                     'testexist.test']
+        cls.md5 = ['d577273ff885c3f84dadb8578bb41399',
+                   '0feb70518ce6f193acfbc6ce285ebc99']
+        with open('tester/' + cls.fname[0], 'w') as fh:
+            fh.write('12345\n')
+
+        with open('tester/' + cls.fname[1], 'w') as fh:
+            fh.write('aabbddhhee\n')
+
+    @classmethod
+    def tearDownClass(cls):
+        for i in cls.fname:
+            try:
+                os.remove('tester/' + i)
+            except:
+                pass
+        os.rmdir('tester')
+
+    def test_get_md5sum_file(self):
+        md5 = dul.get_md5sum_file(self.fname[0])
+        self.assertEqual(md5, self.md5[0])
+
+    def test_get_single_file_disk_info(self):
+        res = dul.get_single_file_disk_info(self.fname[0])
+        self.assertEqual(res['filename'], self.fname[0])
+        self.assertIsNone(res['compression'])
+        self.assertIsNone(res['path'])
+        self.assertEqual(res['filesize'], 6)
+        self.assertTrue('md5sum' not in res)
+
+        res = dul.get_single_file_disk_info('./' + self.fname[0], True, 'rootpath')
+        self.assertEqual(res['md5sum'], self.md5[0])
+        self.assertIsNotNone(res['path'])
+        self.assertTrue('relpath' not in res)
+
+        res = dul.get_single_file_disk_info(os.getcwd() + '/' + self.fname[0], True, '/rootpath')
+        self.assertIsNotNone(res['relpath'])
+
+        os.environ['DISK_UTILS_LOCAL_DEBUG'] = '3'
+        with capture_output() as (out, _):
+            res = dul.get_single_file_disk_info(os.getcwd() + '/' + self.fname[1], True, '/rootpath')
+            output = out.getvalue().strip()
+            self.assertIsNotNone(res['compression'])
+            self.assertEqual(res['filesize'], 11)
+            self.assertTrue('fname' in output)
+            self.assertTrue('path' in output)
+        os.environ['DISK_UTILS_LOCAL_DEBUG'] = '0'
+
+    def test_get_file_disk_info_list(self):
+        res = dul.get_file_disk_info_list(self.fname)
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[self.fname[0]]['filesize'], 6)
+        self.assertTrue('err' in res[self.fname[2]])
+
+    def test_get_file_disk_info(self):
+        res = dul.get_file_disk_info(self.fname)
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[self.fname[0]]['filesize'], 6)
+        self.assertTrue('err' in res[self.fname[2]])
+
+
+        res = dul.get_file_disk_info(os.getcwd() + '/tester')
+        self.assertEqual(len(res), 2)
+
+        with self.assertRaisesRegex(SystemExit, '1') as se:
+            with capture_output() as (out, _):
+                res = dul.get_file_disk_info(3)
+                output = out.getvalue().strip()
+                self.assertTrue('argument list' in output)
+
+    def test_get_file_disk_info_path(self):
+        res = dul.get_file_disk_info_path(os.getcwd() + '/tester')
+        self.assertEqual(len(res), 2)
+        fullname = os.getcwd() + '/tester/' + self.fname[0]
+        self.assertEqual(res[fullname]['filename'], self.fname[0])
+        self.assertIsNone(res[fullname]['compression'])
+        self.assertIsNotNone(res[fullname]['path'])
+        self.assertEqual(res[fullname]['filesize'], 6)
+
+        with self.assertRaisesRegex(SystemExit, '1') as se:
+            with capture_output() as (out, _):
+                res = dul.get_file_disk_info_path('junkjunk')
+                output = out.getvalue().strip()
+                self.assertTrue('does not exist' in output)
 
 if __name__ == '__main__':
     unittest.main()
