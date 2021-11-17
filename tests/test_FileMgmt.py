@@ -194,5 +194,21 @@ class Testdisk_utils_local(unittest.TestCase):
                 output = out.getvalue().strip()
                 self.assertTrue('does not exist' in output)
 
+    def test_remove_file_if_exists(self):
+        dul.remove_file_if_exists('junkjunk')
+        with open('test.junk', 'w') as fh:
+            fh.write('aassddffgghh\n')
+        self.assertTrue(os.path.exists('test.junk'))
+        dul.remove_file_if_exists('test.junk')
+        self.assertFalse(os.path.exists('test.junk'))
+
+    def test_get_files_from_disk(self):
+        with capture_output() as (out, _):
+            res = dul.get_files_from_disk('tester', os.getcwd(), debug=True)
+            self.assertEqual(len(res), 2)
+            output = out.getvalue().strip()
+            self.assertTrue('Getting' in output)
+
+
 if __name__ == '__main__':
     unittest.main()
