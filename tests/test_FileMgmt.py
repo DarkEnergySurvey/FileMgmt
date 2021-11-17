@@ -107,22 +107,22 @@ class Testdisk_utils_local(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.mkdir('tester')
-        cls.fname = ['testf1234.test',
-                     'testf45678.test.gz',
-                     'testexist.test']
+        cls.fname = ['tester/testf1234.test',
+                     'tester/testf45678.test.gz',
+                     'tester/testexist.test']
         cls.md5 = ['d577273ff885c3f84dadb8578bb41399',
                    '0feb70518ce6f193acfbc6ce285ebc99']
-        with open('tester/' + cls.fname[0], 'w') as fh:
+        with open(cls.fname[0], 'w') as fh:
             fh.write('12345\n')
 
-        with open('tester/' + cls.fname[1], 'w') as fh:
+        with open(cls.fname[1], 'w') as fh:
             fh.write('aabbddhhee\n')
 
     @classmethod
     def tearDownClass(cls):
         for i in cls.fname:
             try:
-                os.remove('tester/' + i)
+                os.remove(i)
             except:
                 pass
         os.rmdir('tester')
@@ -133,9 +133,9 @@ class Testdisk_utils_local(unittest.TestCase):
 
     def test_get_single_file_disk_info(self):
         res = dul.get_single_file_disk_info(self.fname[0])
-        self.assertEqual(res['filename'], self.fname[0])
+        self.assertTrue(self.fname[0].endswith(res['filename']))
         self.assertIsNone(res['compression'])
-        self.assertIsNone(res['path'])
+        self.assertIsNotNone(res['path'])
         self.assertEqual(res['filesize'], 6)
         self.assertTrue('md5sum' not in res)
 
@@ -182,8 +182,8 @@ class Testdisk_utils_local(unittest.TestCase):
     def test_get_file_disk_info_path(self):
         res = dul.get_file_disk_info_path(os.getcwd() + '/tester')
         self.assertEqual(len(res), 2)
-        fullname = os.getcwd() + '/tester/' + self.fname[0]
-        self.assertEqual(res[fullname]['filename'], self.fname[0])
+        fullname = os.getcwd() + '/' + self.fname[0]
+        self.assertTrue(self.fname[0].endswith(res[fullname]['filename']))
         self.assertIsNone(res[fullname]['compression'])
         self.assertIsNotNone(res[fullname]['path'])
         self.assertEqual(res[fullname]['filesize'], 6)
