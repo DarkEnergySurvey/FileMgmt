@@ -7,6 +7,41 @@ import filemgmt.disk_utils_local as diskutils
 import filemgmt.db_utils_local as dbutils
 import filemgmt.fmutils as fmutils
 
+class Print:
+    """ Class to capture printed output and write it to a log file
+
+        Parameters
+        ----------
+        logfile : str
+            The log file to write to
+
+    """
+    def __init__(self, logfile):
+        self.old_stdout = sys.stdout
+        self.logfile = open(logfile, 'w')
+
+    def write(self, text):
+        """ Method to capture, reformat, and write out the requested text
+
+            Parameters
+            ----------
+            test : str
+                The text to reformat
+
+        """
+        self.logfile.write(text)
+
+    def close(self):
+        """ Method to return stdout to its original handle
+
+        """
+        return self.old_stdout
+
+    def flush(self):
+        """ Method to force the buffer to flush
+
+        """
+        self.old_stdout.flush()
 
 def gather_data(dbh, args):
     """ Make sure command line arguments have valid values
@@ -39,6 +74,63 @@ def gather_data(dbh, args):
     if args.verbose:
         args.silent = False
     return archive_root, archive_path, relpath, operator, pfwid
+
+def determine_ids(args):
+    if args.dbh is None:
+        args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
+    # do some quick validation
+    if args.date_range and args.pfwid:
+        print("Date_range was specified, thus pfwid cannot be.")
+    if args.relpath and (args.reqnum or args.unitname or args.attnum or args.tag or args.pfwid):
+        print("Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified.")
+        sys.exit(1)
+    if args.reqnum and (args.tag or args.pfwid):
+        print("Reqnum was specified, thus tag and pfwid cannot be specified.")
+        sys.exit(1)
+    if args.tag and args.pfwid:
+        print("Tag was specified, thus pfwid cannot be specified.")
+        sys.exit(1)
+    if (args.unitname or args.attnum) and not args.reqnum:
+        print("Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again.")
+        sys.exit(1)
+
+    # if dealing with a date range then get the relevant pfw_attempt_ids
+    if args.date_range:
+        dates = args.date_range.split(',')
+        whereclause = []
+        if len(dates) == 1:
+            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[0]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
+        else:
+            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[1]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
+        if args.pipeline:
+            whereclause.append(f"subpipeprod='{args.pipeline}'")
+        if args.reqnum:
+            whereclause.append(f"reqnum={args.reqnum}")
+            if args.unitname:
+                whereclause.append(f"unitname='{args.unitname}'")
+            if args.attnum:
+                whereclause.append(f"attnum={args.attnum}")
+        elif args.tag:
+            whereclause.append(f"id in (select pfw_attempt_id from proctag where tag='{args.tag}')")
+        pfwids = dbutils.get_pfw_attempt_ids_where(dbh, whereclause, 'id')
+
+        if not args.silent:
+            print(f"Found {len(pfwids):d} pfw_attempt_id's for the given date range (and any qualifying tag/reqnum)")
+    else:
+        pfwids = []
+        # if dealing with a tag then get the relevant pfw_attempt_ids
+        if args.tag:
+            pfwids = dbutils.get_pfw_attempt_id_from_tag(dbh, args.tag)
+        # if dealing with a triplet
+        elif args.reqnum:
+            pfwids = dbutils.get_pfw_attempt_ids_from_triplet(dbh, args)
+            args.reqnum = None
+            args.unitname = None
+            args.attnum = None
+        elif args.pfwid and ',' in args.pfwid:
+            pfwids = args.pfwid.split(',')
+
+    return args, pfwids
 
 def print_all_files(comparison_info, files_from_db, files_from_disk):
     """ Print both lists of files side by side
@@ -286,65 +378,14 @@ def run_compare(args):
         the result from do_compare
 
     """
-    # connect to the database
-    if args.dbh is None:
-        dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
-    else:
-        dbh = args.dbh
-    # do some quick validation
-    if args.date_range and args.pfwid:
-        print("Date_range was specified, thus pfwid cannot be.")
-    if args.relpath and (args.reqnum or args.unitname or args.attnum or args.tag or args.pfwid):
-        print("Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified.")
-        sys.exit(1)
-    if args.reqnum and (args.tag or args.pfwid):
-        print("Reqnum was specified, thus tag and pfwid cannot be specified.")
-        sys.exit(1)
-    if args.tag and args.pfwid:
-        print("Tag was specified, thus pfwid cannot be specified.")
-        sys.exit(1)
-    if (args.unitname or args.attnum) and not args.reqnum:
-        print("Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again.")
-        sys.exit(1)
+    (args, pfwids) = determine_ids(args)
 
     # if dealing with a date range then get the relevant pfw_attempt_ids
     if args.date_range:
-        dates = args.date_range.split(',')
-        whereclause = []
-        if len(dates) == 1:
-            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[0]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
-        else:
-            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[1]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
-        if args.pipeline:
-            whereclause.append(f"subpipeprod='{args.pipeline}'")
-        if args.reqnum:
-            whereclause.append(f"reqnum={args.reqnum}")
-            if args.unitname:
-                whereclause.append(f"unitname='{args.unitname}'")
-            if args.attnum:
-                whereclause.append(f"attnum={args.attnum}")
-        elif args.tag:
-            whereclause.append(f"id in (select pfw_attempt_id from proctag where tag='{args.tag}')")
-        pfwids = dbutils.get_pfw_attempt_ids_where(dbh, whereclause, 'id')
-
-        if not args.silent:
-            print(f"Found {len(pfwids):d} pfw_attempt_id's for the given date range (and any qualifying tag/reqnum)")
         if not pfwids:
             return 0
         return multi_compare(dbh, pfwids, args)
 
-    pfwids = []
-    # if dealing with a tag then get the relevant pfw_attempt_ids
-    if args.tag:
-        pfwids = dbutils.get_pfw_attempt_id_from_tag(dbh, args.tag)
-    # if dealing with a triplet
-    elif args.reqnum:
-        pfwids = dbutils.get_pfw_attempt_ids_from_triplet(dbh, args)
-        args.reqnum = None
-        args.unitname = None
-        args.attnum = None
-    elif args.pfwid and ',' in args.pfwid:
-        pfwids = args.pfwid.split(',')
     # if only a single comparison was requested (single pfw_attempt_id, triplet (reqnum, uniname, attnum), or path)
     if not pfwids:
         return do_compare(dbh, args)
@@ -378,7 +419,7 @@ def do_compare(dbh, args):
         addon = ""
         dbaddon = ""
         if duplicates:
-            addon += "f({len(files_from_disk):d} are distinct)"
+            addon += f"({len(files_from_disk):d} are distinct)"
         if db_duplicates:
             dbaddon += f"({len(files_from_db):d} are distinct)"
         print(f"Number of files from db   = {len(files_from_db) + len(db_duplicates):d}   {dbaddon}")
