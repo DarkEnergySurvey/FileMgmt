@@ -19,10 +19,10 @@ def migrate(files_from_db, current, destination, archive_root):
         else:
             dst = destination + items['path']
         (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
-        #path = Path(rpath)
-        #path.mkdir(parents=True, exist_ok=True)
+        path = Path(rpath)
+        path.mkdir(parents=True, exist_ok=True)
         print(f"mkdir {os.path.join(archive_root, dst)}")
-        #shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
+        shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
         results.append({'pth': dst, 'fn':filename, 'comp':compress, 'orig': items['path']})
     return results
@@ -64,14 +64,14 @@ def do_migration(dbh, args):
     print(upsql)
     for item in newloc:
         print(f"    {item}")
-    #curs = dbh.cursor()
-    #curs.executemany(upsql, newloc)
-    #curs.execute(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
+    curs = dbh.cursor()
+    curs.executemany(upsql, newloc)
+    curs.execute(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
     print(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
 
-    #dbh.commit()
+    dbh.commit()
     # get new file info from db
-    """
+
     files_from_db, db_duplicates = dbutils.get_files_from_db(dbh, newpath, args.archive, pfwid, None, debug=args.debug)
     files_from_disk, duplicates = diskutils.get_files_from_disk(newpath, archive_root, True, args.debug)
 
@@ -100,7 +100,7 @@ def do_migration(dbh, args):
         curs.executemany(upsql, newloc)
         return 1
     # remove old files
-    """
+
     rml = []
     for item in newloc:
         fname = item['fn']
@@ -110,7 +110,7 @@ def do_migration(dbh, args):
     for r in rml:
         print(r)
     ok = False
-    """
+
     while not ok:
         res = input("Delete the above files[y/n]?")
         if res.lower() == 'y':
@@ -119,7 +119,7 @@ def do_migration(dbh, args):
             return 0
         if res.lower() == 'n':
             return 0
-            """
+
 def multi_migrate(dbh, pfwids, args):
     """ Method to iterate over pfw_attempt_id's and run the migration script
 
