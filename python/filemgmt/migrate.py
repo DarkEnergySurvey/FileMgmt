@@ -14,6 +14,8 @@ import filemgmt.compare_utils as compare
 def migrate(files_from_db, current, destination, archive_root):
     results = {"null": [],
                "comp": []}
+    paths = {"null": [],
+               "comp": []}
     for fname, items in files_from_db.items():
         if current is not None:
             dst = items['path'].replace(current, destination)
@@ -26,10 +28,13 @@ def migrate(files_from_db, current, destination, archive_root):
         shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
         if compress is None:
-            results['null'].append({'pth': dst, 'fn':filename})#, 'orig': items['path']})
+            results['null'].append({'pth': dst, 'fn':filename})#,
+            paths['null'].append({'orig': items['path']})
         else:
             results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})#, 'orig': items['path']})
-    return results
+            paths['comp'].append({'orig': items['path']})
+
+    return results, paths
 
 def do_migration(dbh, args):
     """ Method to migrate the data
@@ -63,7 +68,7 @@ def do_migration(dbh, args):
     path = Path(newarchpath)
     path.mkdir(parents=True, exist_ok=True)
 
-    newloc = migrate(files_from_db, args.current, args.destination, archive_root)
+    newloc, paths = migrate(files_from_db, args.current, args.destination, archive_root)
     if newloc['comp'] :
         upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
         print(upsql)
@@ -114,12 +119,12 @@ def do_migration(dbh, args):
     # remove old files
 
     rml = []
-    for item in newloc['comp']:
+    for i, item in enumerate(newloc['comp']):
         fname = item['fn'] + item['comp']
-        rml.append(os.path.join(archive_root, item['orig'], fname))
-    for item in newloc['null']:
+        rml.append(os.path.join(archive_root, paths[i]['orig'], fname))
+    for i, item in enumerate(newloc['null']):
         fname = item['fn']
-        rml.append(os.path.join(archive_root, item['orig'], fname))
+        rml.append(os.path.join(archive_root, paths[i]['orig'], fname))
 
     for r in rml:
         print(r)
