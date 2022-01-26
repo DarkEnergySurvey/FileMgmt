@@ -12,7 +12,8 @@ import filemgmt.db_utils_local as dbutils
 import filemgmt.compare_utils as compare
 
 def migrate(files_from_db, current, destination, archive_root):
-    results = []
+    results = {"null": [],
+               "comp": [])
     for fname, items in files_from_db.items():
         if current is not None:
             dst = items['path'].replace(current, destination)
@@ -25,8 +26,9 @@ def migrate(files_from_db, current, destination, archive_root):
         shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
         if compress is None:
-            compress = 'NULL'
-        results.append({'pth': dst, 'fn':filename, 'comp':compress})#, 'orig': items['path']})
+            results['null'].append({'pth': dst, 'fn':filename})#, 'orig': items['path']})
+        else:
+            results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})#, 'orig': items['path']})
     return results
 
 def do_migration(dbh, args):
@@ -62,12 +64,20 @@ def do_migration(dbh, args):
     path.mkdir(parents=True, exist_ok=True)
 
     newloc = migrate(files_from_db, args.current, args.destination, archive_root)
-    upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
-    print(upsql)
-    for item in newloc:
-        print(f"    {item}")
-    curs = dbh.cursor()
-    curs.executemany(upsql, newloc)
+    if newloc['comp'] :
+        upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
+        print(upsql)
+        for item in newloc:
+            print(f"    {item}")
+        curs = dbh.cursor()
+        curs.executemany(upsql, newloc['comp'])
+    if newloc['null'] :
+        upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
+        print(upsql)
+        for item in newloc:
+            print(f"    {item}")
+        curs = dbh.cursor()
+        curs.executemany(upsql, newloc['null'])
     print(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
     curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={pfwid}")
 
