@@ -66,8 +66,8 @@ def do_migration(dbh, args):
         print(f"    {item}")
     curs = dbh.cursor()
     curs.executemany(upsql, newloc)
-    curs.execute(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
     print(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
+    curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={pfwid}")
 
     dbh.commit()
     # get new file info from db
