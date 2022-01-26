@@ -19,8 +19,8 @@ def migrate(files_from_db, current, destination, archive_root):
         else:
             dst = destination + items['path']
         (rpath, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
-        path = Path(rpath)
-        path.mkdir(parents=True, exist_ok=True)
+        #path = Path(rpath)
+        #path.mkdir(parents=True, exist_ok=True)
         print(f"mkdir {rpath}")
         #shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
