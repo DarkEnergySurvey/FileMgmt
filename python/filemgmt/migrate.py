@@ -63,7 +63,7 @@ def do_migration(dbh, args):
     upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
     print(upsql)
     for item in newloc:
-        print(f"    {newloc}")
+        print(f"    {item}")
     #curs = dbh.cursor()
     #curs.executemany(upsql, newloc)
     #curs.execute(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
