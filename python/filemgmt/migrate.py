@@ -21,7 +21,7 @@ def migrate(files_from_db, current, destination, archive_root):
         #shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
         (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
-        results[fname] = {'pth': dst, 'fn':filename, 'comp':compress, 'orig': items['path']}
+        results.append({'pth': dst, 'fn':filename, 'comp':compress, 'orig': items['path']})
     return results
 
 def do_migration(dbh, args):
