@@ -67,14 +67,14 @@ def do_migration(dbh, args):
     if newloc['comp'] :
         upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
         print(upsql)
-        for item in newloc:
+        for item in newloc['comp']:
             print(f"    {item}")
         curs = dbh.cursor()
         curs.executemany(upsql, newloc['comp'])
     if newloc['null'] :
         upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
         print(upsql)
-        for item in newloc:
+        for item in newloc['null']:
             print(f"    {item}")
         curs = dbh.cursor()
         curs.executemany(upsql, newloc['null'])
@@ -114,11 +114,13 @@ def do_migration(dbh, args):
     # remove old files
 
     rml = []
-    for item in newloc:
-        fname = item['fn']
-        if item['comp'] is not None:
-            fname += item['comp']
+    for item in newloc['comp']:
+        fname = item['fn'] + item['comp']
         rml.append(os.path.join(archive_root, item['orig'], fname))
+    for item in newloc['null']:
+        fname = item['fn']
+        rml.append(os.path.join(archive_root, item['orig'], fname))
+
     for r in rml:
         print(r)
     ok = False
