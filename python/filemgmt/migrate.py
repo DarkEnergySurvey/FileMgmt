@@ -121,10 +121,10 @@ def do_migration(dbh, args):
     rml = []
     for i, item in enumerate(newloc['comp']):
         fname = item['fn'] + item['comp']
-        rml.append(os.path.join(archive_root, paths[i]['orig'], fname))
+        rml.append(os.path.join(archive_root, paths['comp'][i]['orig'], fname))
     for i, item in enumerate(newloc['null']):
         fname = item['fn']
-        rml.append(os.path.join(archive_root, paths[i]['orig'], fname))
+        rml.append(os.path.join(archive_root, paths['null'][i]['orig'], fname))
 
     for r in rml:
         print(r)
