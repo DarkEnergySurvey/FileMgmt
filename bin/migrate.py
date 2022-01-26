@@ -56,7 +56,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
     #parser.add_argument('--date_range', action='store', help='Date range of submit time in YYYY-MM-DD format. If date is given then only data from that date are checked, if two comma separated dates are given then all data from between those dates (inclusive) are checked.')
-    parser.add_argument('--pipeline', action='store', help='Compare data from a specific pipeline (subpipeprod in pfw_attempt), only used in conjunction with date_range')
+    #parser.add_argument('--pipeline', action='store', help='Compare data from a specific pipeline (subpipeprod in pfw_attempt), only used in conjunction with date_range')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
     parser.add_argument('--start_at', action='store', help='Index to start at (1 based), useful for doing checking in chunks.', type=int, default=1)
     parser.add_argument('--end_at', action='store', help='Index to end at (1 based), useful for doing checking in chunks.', type=int, default=0)
