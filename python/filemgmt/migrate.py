@@ -24,7 +24,7 @@ def migrate(files_from_db, current, destination, archive_root):
         print(f"mkdir {os.path.join(archive_root, dst)}")
         shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
         print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
-        results.append({'pth': dst, 'fn':filename, 'comp':compress, 'orig': items['path']})
+        results.append({'pth': dst, 'fn':filename, 'comp':compress})#, 'orig': items['path']})
     return results
 
 def do_migration(dbh, args):
@@ -95,9 +95,9 @@ def do_migration(dbh, args):
     if error:
         print("Error summary")
         compare.diff_files(comparison_info, files_from_db, files_from_disk, True, True, duplicates, db_duplicates)
-        upsql = "update file_archive_info set path=:orig where filename=:fn and compression=:comp"
-        curs = dbh.cursor()
-        curs.executemany(upsql, newloc)
+        #upsql = "update file_archive_info set path=:orig where filename=:fn and compression=:comp"
+        #curs = dbh.cursor()
+        #curs.executemany(upsql, newloc)
         return 1
     # remove old files
 
