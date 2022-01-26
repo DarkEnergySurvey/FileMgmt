@@ -13,7 +13,7 @@ import filemgmt.compare_utils as compare
 
 def migrate(files_from_db, current, destination, archive_root):
     results = {"null": [],
-               "comp": [])
+               "comp": []}
     for fname, items in files_from_db.items():
         if current is not None:
             dst = items['path'].replace(current, destination)
