@@ -24,9 +24,9 @@ def migrate(files_from_db, current, destination, archive_root):
         (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
         path = Path(os.path.join(archive_root, dst))
         path.mkdir(parents=True, exist_ok=True)
-        print(f"mkdir {os.path.join(archive_root, dst)}")
+        #print(f"mkdir {os.path.join(archive_root, dst)}")
         shutil.copy2(os.path.join(archive_root, items['path'], fname), os.path.join(archive_root, dst, fname))
-        print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
+        #print(f"moving {os.path.join(archive_root, items['path'], fname)} to {os.path.join(archive_root, dst, fname)}")
         if compress is None:
             results['null'].append({'pth': dst, 'fn':filename})#,
             paths['null'].append({'orig': items['path']})
