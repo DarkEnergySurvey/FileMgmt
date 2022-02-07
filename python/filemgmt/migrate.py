@@ -71,19 +71,19 @@ def do_migration(dbh, args):
     newloc, paths = migrate(files_from_db, args.current, args.destination, archive_root)
     if newloc['comp'] :
         upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
-        print(upsql)
-        for item in newloc['comp']:
-            print(f"    {item}")
+        #print(upsql)
+        #for item in newloc['comp']:
+        #    print(f"    {item}")
         curs = dbh.cursor()
         curs.executemany(upsql, newloc['comp'])
     if newloc['null'] :
         upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
-        print(upsql)
-        for item in newloc['null']:
-            print(f"    {item}")
+        #print(upsql)
+        #for item in newloc['null']:
+        #    print(f"    {item}")
         curs = dbh.cursor()
         curs.executemany(upsql, newloc['null'])
-    print(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
+    #print(f"update pfw_attempt set archive_path={newpath} where id={pfwid}")
     curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={pfwid}")
 
     dbh.commit()
@@ -126,16 +126,17 @@ def do_migration(dbh, args):
         fname = item['fn']
         rml.append(os.path.join(archive_root, paths['null'][i]['orig'], fname))
 
+    print('\n\n')
     for r in rml:
         print(r)
     ok = False
-
+    print(f"\n{os.path.join(archive_root,relpath)}\n")
     while not ok:
         res = input("Delete the above files[y/n]?")
         if res.lower() == 'y':
-            for r in rml:
-                os.remove(r)
-            shutil.rmtree(os.path.join(archive_root,newpath))
+            #for r in rml:
+            #    os.remove(r)
+            shutil.rmtree(os.path.join(archive_root,relpath))
             return 0
         if res.lower() == 'n':
             return 0
