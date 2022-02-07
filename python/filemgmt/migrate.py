@@ -135,6 +135,7 @@ def do_migration(dbh, args):
         if res.lower() == 'y':
             for r in rml:
                 os.remove(r)
+            shutil.rmtree(os.path.join(archive_root,newpath))
             return 0
         if res.lower() == 'n':
             return 0
