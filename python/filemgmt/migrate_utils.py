@@ -149,7 +149,7 @@ class Migration:
             archive_root: str
                 The archive root path
         """
-        print(f"Copying {self.count} files...")
+        print(f"\n\nCopying {self.count} files...")
         done = 0
         self.printProgressBar(0)
         for fname, items in files_from_db.items():
@@ -192,6 +192,7 @@ class Migration:
             -------
             the result
         """
+        print("Gathering file info from DB")
         self.archive_root, _, relpath, _, pfwid = compare.gather_data(self.dbh, self.args)
         if not relpath:
             print(f'  Connot do migration for pfw_attempt_id, no relpath found {pfwid}')
@@ -291,6 +292,7 @@ class Migration:
             if res.lower() == 'n':
                 self.rollback()
                 return 0
+            print()
         if cannot_del:
             print("Cannot delete the following files:")
             for f in cannot_del:
