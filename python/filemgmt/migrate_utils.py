@@ -5,6 +5,7 @@
 import os
 import shutil
 from pathlib import Path
+import time
 
 from despymisc import miscutils
 import filemgmt.disk_utils_local as diskutils
@@ -63,6 +64,7 @@ class Migration:
         self.count = 0
         self.stop = False
         self.status = 0
+        self.currnewpath = None
 
     def __del__(self):
         if self.dbh:
@@ -83,6 +85,7 @@ class Migration:
             return
         self.stop = True
         print("\nRolling back any changes...\n")
+        time.sleep(1.5)
         if self.dbh:
             self.dbh.rollback()
         bad_files = []
@@ -219,6 +222,7 @@ class Migration:
             print(f"  ERROR: new path is the same as the original {newpath} == {relpath}")
             return 1
         newarchpath = os.path.join(self.archive_root, newpath)
+        self.currnewpath = newpath
         #print archive_root
         if self.debug:
             print("From DB")
@@ -353,4 +357,4 @@ class Migration:
         if self.status != 0:
             print("The process cannot be interrupted at this stage")
             return
-        self.rollback()
+        self.rollback(self.currnewpath)
