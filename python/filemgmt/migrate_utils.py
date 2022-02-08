@@ -319,6 +319,12 @@ class Migration:
         length = len(self.pfwids)
 
         for i, pdwi in enumerate(self.pfwids):
+            self.copied_files = []
+            self.results = {"null": [],
+                            "comp": []}
+            self.paths = {"null": [],
+                          "comp": []}
+            self.count = 0
             print(f"--------------------- Starting {pdwi}    {i + 1:d}/{length:d} ---------------------")
             self.pfwid = pdwi
             self.args.pfwid = pdwi
