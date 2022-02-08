@@ -5,6 +5,7 @@
 import sys
 import argparse
 import datetime
+import signal
 import filemgmt.compare_utils as compare
 from filemgmt import migrate_utils as mu
 
@@ -87,6 +88,7 @@ def main():
         stdp = compare.Print(args.log)
         sys.stdout = stdp
     migrate = mu.Migration(args)
+    signal.signal(signal.SIGINT, migrate.interrupt)
     migrate.go()
     if args.log is not None:
         sys.stdout.flush()

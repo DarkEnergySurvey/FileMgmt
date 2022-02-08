@@ -329,3 +329,6 @@ class Migration:
             self.pfwid = pdwi
             self.args.pfwid = pdwi
             self.do_migration()
+
+    def interrupt(self, signum, frame):
+        self.rollback()
