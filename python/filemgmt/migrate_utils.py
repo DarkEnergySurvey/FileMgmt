@@ -82,19 +82,20 @@ class Migration:
             self.dbh.rollback()
         bad_files = []
         self.count = len(self.copied_files)
-        self.printProgressBar(0)
-        for i, f in enumerate(self.copied_files):
-            try:
-                os.remove(f)
-                self.printProgressBar(i+1)
-            except:
-                bad_files.append(f)
-        if newpath is not None:
-            removeEmptyFolders(os.path.join(self.archive_root, newpath))
-        if bad_files:
-            print(f"Could not remove {len(bad_files)} copied files:")
-            for f in bad_files:
-                print(f"    {f}")
+        if self.count > 0:
+            self.printProgressBar(0)
+            for i, f in enumerate(self.copied_files):
+                try:
+                    os.remove(f)
+                    self.printProgressBar(i+1)
+                except:
+                    bad_files.append(f)
+            if newpath is not None:
+                removeEmptyFolders(os.path.join(self.archive_root, newpath))
+            if bad_files:
+                print(f"Could not remove {len(bad_files)} copied files:")
+                for f in bad_files:
+                    print(f"    {f}")
 
     def go(self):
         """ Method to migrate the files
