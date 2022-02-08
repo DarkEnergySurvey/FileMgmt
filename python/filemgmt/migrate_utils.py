@@ -5,7 +5,7 @@
 import os
 import shutil
 from pathlib import Path
-import threading
+import time
 
 from despymisc import miscutils
 import filemgmt.disk_utils_local as diskutils
@@ -36,7 +36,6 @@ class Migration:
     """ Class for migrating data
 
     """
-    lock = threading.Lock()
     copied_files = []
     stop = False
     status = 0
@@ -86,25 +85,25 @@ class Migration:
             return
         Migration.stop = True
         print("\nRolling back any changes...\n")
-        with Migration.lock:
-            if self.dbh:
-                self.dbh.rollback()
-            bad_files = []
-            self.count = len(Migration.copied_files)
-            if self.count > 0:
-                self.printProgressBar(0)
-                for i, f in enumerate(Migration.copied_files):
-                    try:
-                        os.remove(f)
-                        self.printProgressBar(i+1)
-                    except:
-                        bad_files.append(f)
-                if newpath is not None:
-                    removeEmptyFolders(os.path.join(self.archive_root, newpath))
-                if bad_files:
-                    print(f"Could not remove {len(bad_files)} copied files:")
-                    for f in bad_files:
-                        print(f"    {f}")
+        time.sleep(5)
+        if self.dbh:
+            self.dbh.rollback()
+        bad_files = []
+        self.count = len(Migration.copied_files)
+        if self.count > 0:
+            self.printProgressBar(0)
+            for i, f in enumerate(Migration.copied_files):
+                try:
+                    os.remove(f)
+                    self.printProgressBar(i+1)
+                except:
+                    bad_files.append(f)
+            if newpath is not None:
+                removeEmptyFolders(os.path.join(self.archive_root, newpath))
+            if bad_files:
+                print(f"Could not remove {len(bad_files)} copied files:")
+                for f in bad_files:
+                    print(f"    {f}")
 
     def go(self):
         """ Method to migrate the files
@@ -167,37 +166,36 @@ class Migration:
         print(f"\n\nCopying {self.count} files...")
         done = 0
         self.printProgressBar(0)
-        with Migration.lock:
-            for fname, items in files_from_db.items():
-                if Migration.stop:
-                    return
-                if self.current is not None:
-                    dst = items['path'].replace(self.current, self.destination)
-                else:
-                    dst = self.destination + items['path']
-                (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
-                path = Path(os.path.join(self.archive_root, dst))
-                try:
-                    path.mkdir(parents=True, exist_ok=True)
-                except:
-                    print(f"\nError making directory {os.path.join(self.archive_root, dst)}")
-                    self.rollback()
-                    raise
-                try:
-                    shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
-                    Migration.copied_files.append(os.path.join(self.archive_root, dst, fname))
-                except:
-                    print(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
-                    self.rollback()
-                    raise
-                if compress is None:
-                    self.results['null'].append({'pth': dst, 'fn':filename})#,
-                    self.paths['null'].append({'orig': items['path']})
-                else:
-                    self.results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})
-                    self.paths['comp'].append({'orig': items['path']})
-                done += 1
-                self.printProgressBar(done)
+        for fname, items in files_from_db.items():
+            if Migration.stop:
+                return
+            if self.current is not None:
+                dst = items['path'].replace(self.current, self.destination)
+            else:
+                dst = self.destination + items['path']
+            (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
+            path = Path(os.path.join(self.archive_root, dst))
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except:
+                print(f"\nError making directory {os.path.join(self.archive_root, dst)}")
+                self.rollback()
+                raise
+            try:
+                shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
+                Migration.copied_files.append(os.path.join(self.archive_root, dst, fname))
+            except:
+                print(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
+                self.rollback()
+                raise
+            if compress is None:
+                self.results['null'].append({'pth': dst, 'fn':filename})#,
+                self.paths['null'].append({'orig': items['path']})
+            else:
+                self.results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})
+                self.paths['comp'].append({'orig': items['path']})
+            done += 1
+            self.printProgressBar(done)
 
     def do_migration(self):
         """ Method to migrate the data
