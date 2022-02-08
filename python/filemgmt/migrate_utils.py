@@ -55,6 +55,7 @@ class Migration:
         self.tag = self.args.tag
         self.archive_root = None
         self.copied_files = []
+        self.force = args.force
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
@@ -279,8 +280,10 @@ class Migration:
         print(f"\n{os.path.join(self.archive_root,relpath)}\n")
         cannot_del = []
         while not ok:
-            res = input("Delete files in the above directory[y/n]?")
-            if res.lower() == 'y':
+            res = ""
+            if not self.force:
+                res = input("Delete files in the above directory[y/n]?")
+            if res.lower() == 'y' or self.force:
                 self.dbh.commit()
                 self.printProgressBar(0)
                 for i, r in enumerate(rml):
@@ -291,7 +294,7 @@ class Migration:
                         cannot_del.append(r)
                 removeEmptyFolders(os.path.join(self.archive_root,relpath))
                 ok = True
-            if res.lower() == 'n':
+            elif res.lower() == 'n':
                 self.rollback(newpath)
                 return 0
             print()

@@ -60,6 +60,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
     parser.add_argument('--date_range', action='store', help='Not used')
     #parser.add_argument('--pipeline', action='store', help='Compare data from a specific pipeline (subpipeprod in pfw_attempt), only used in conjunction with date_range')
+    parser.add_argument('--force', action='store_true', help='Do not ask to delete files, just do it')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
     parser.add_argument('--start_at', action='store', help='Not used', type=int, default=1)
     parser.add_argument('--end_at', action='store', help='Not used', type=int, default=0)
