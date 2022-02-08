@@ -236,10 +236,10 @@ class Migration:
             raise
         # get new file info from db
 
+        print("Running comparison of new files and database...")
         files_from_db, db_duplicates = dbutils.get_files_from_db(self.dbh, newpath, self.archive, pfwid, None, debug=self.debug)
         files_from_disk, duplicates = diskutils.get_files_from_disk(newpath, self.archive_root, True, self.debug)
 
-        print("Running comparison of new files and database...")
         comparison_info = diskutils.compare_db_disk(files_from_db, files_from_disk, duplicates, True, self.debug, self.archive_root)
         error = False
         if len(comparison_info['dbonly']) > 0:
@@ -263,7 +263,7 @@ class Migration:
             self.rollback()
             return 1
         # remove old files
-
+        print("     Complete, all files match")
         rml = []
         for i, item in enumerate(self.results['comp']):
             fname = item['fn'] + item['comp']
