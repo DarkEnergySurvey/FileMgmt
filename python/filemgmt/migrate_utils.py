@@ -73,7 +73,7 @@ class Migration:
         pbar = fill * filledLength + '-' * (length - filledLength)
         print(f'\rProgress: |{pbar}| {percent}', end = printEnd)
 
-    def rollback(self):
+    def rollback(self, newpath=None):
         """ Method to undo any changes if something goes wrong
         """
         print("\nRolling back any changes...\n")
@@ -88,6 +88,8 @@ class Migration:
                 self.printProgressBar(i+1)
             except:
                 bad_files.append(f)
+        if newpath is not None:
+            removeEmptyFolders(os.path.join(self.archive_root, newpath))
         if bad_files:
             print(f"Could not remove {len(bad_files)} copied files:")
             for f in bad_files:
@@ -290,7 +292,7 @@ class Migration:
                 removeEmptyFolders(os.path.join(self.archive_root,relpath))
                 ok = True
             if res.lower() == 'n':
-                self.rollback()
+                self.rollback(newpath)
                 return 0
             print()
         if cannot_del:

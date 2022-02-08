@@ -92,7 +92,7 @@ def main():
         sys.stdout = stdp.close()
     end = datetime.datetime.now()
     duration = end - start
-    print(f"Job took {duration.total_seconds():.1f} seconds")
+    print(f"\nJob took {duration.total_seconds():.1f} seconds")
     sys.exit(ret)
 
 if __name__ == "__main__":
