@@ -5,7 +5,7 @@
 import os
 import shutil
 from pathlib import Path
-import time
+import threading
 
 from despymisc import miscutils
 import filemgmt.disk_utils_local as diskutils
@@ -36,6 +36,10 @@ class Migration:
     """ Class for migrating data
 
     """
+    lock = threading.lock()
+    copied_files = []
+    stop = False
+    status = 0
     def __init__(self, args):
         (self.args, self.pfwids) = compare.determine_ids(args)
         self.dbh = self.args.dbh
@@ -55,15 +59,12 @@ class Migration:
         self.silent = self.args.silent
         self.tag = self.args.tag
         self.archive_root = None
-        self.copied_files = []
         self.force = args.force
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
                       "comp": []}
         self.count = 0
-        self.stop = False
-        self.status = 0
         self.currnewpath = None
 
     def __del__(self):
@@ -81,29 +82,29 @@ class Migration:
     def rollback(self, newpath=None):
         """ Method to undo any changes if something goes wrong
         """
-        if self.stop:
+        if Migration.stop:
             return
-        self.stop = True
+        Migration.stop = True
         print("\nRolling back any changes...\n")
-        time.sleep(5)
-        if self.dbh:
-            self.dbh.rollback()
-        bad_files = []
-        self.count = len(self.copied_files)
-        if self.count > 0:
-            self.printProgressBar(0)
-            for i, f in enumerate(self.copied_files):
-                try:
-                    os.remove(f)
-                    self.printProgressBar(i+1)
-                except:
-                    bad_files.append(f)
-            if newpath is not None:
-                removeEmptyFolders(os.path.join(self.archive_root, newpath))
-            if bad_files:
-                print(f"Could not remove {len(bad_files)} copied files:")
-                for f in bad_files:
-                    print(f"    {f}")
+        with Migration.lock:
+            if self.dbh:
+                self.dbh.rollback()
+            bad_files = []
+            self.count = len(Migration.copied_files)
+            if self.count > 0:
+                self.printProgressBar(0)
+                for i, f in enumerate(Migration.copied_files):
+                    try:
+                        os.remove(f)
+                        self.printProgressBar(i+1)
+                    except:
+                        bad_files.append(f)
+                if newpath is not None:
+                    removeEmptyFolders(os.path.join(self.archive_root, newpath))
+                if bad_files:
+                    print(f"Could not remove {len(bad_files)} copied files:")
+                    for f in bad_files:
+                        print(f"    {f}")
 
     def go(self):
         """ Method to migrate the files
@@ -132,7 +133,7 @@ class Migration:
         self.printProgressBar(0)
         done = 0
         for fname, items in files_from_db.items():
-            if self.stop:
+            if Migration.stop:
                 return False
             if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
                 bad_files.append(fname)
@@ -166,36 +167,37 @@ class Migration:
         print(f"\n\nCopying {self.count} files...")
         done = 0
         self.printProgressBar(0)
-        for fname, items in files_from_db.items():
-            if self.stop:
-                return
-            if self.current is not None:
-                dst = items['path'].replace(self.current, self.destination)
-            else:
-                dst = self.destination + items['path']
-            (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
-            path = Path(os.path.join(self.archive_root, dst))
-            try:
-                path.mkdir(parents=True, exist_ok=True)
-            except:
-                print(f"\nError making directory {os.path.join(self.archive_root, dst)}")
-                self.rollback()
-                raise
-            try:
-                shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
-                self.copied_files.append(os.path.join(self.archive_root, dst, fname))
-            except:
-                print(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
-                self.rollback()
-                raise
-            if compress is None:
-                self.results['null'].append({'pth': dst, 'fn':filename})#,
-                self.paths['null'].append({'orig': items['path']})
-            else:
-                self.results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})
-                self.paths['comp'].append({'orig': items['path']})
-            done += 1
-            self.printProgressBar(done)
+        with Migration.lock:
+            for fname, items in files_from_db.items():
+                if Migration.stop:
+                    return
+                if self.current is not None:
+                    dst = items['path'].replace(self.current, self.destination)
+                else:
+                    dst = self.destination + items['path']
+                (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
+                path = Path(os.path.join(self.archive_root, dst))
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                except:
+                    print(f"\nError making directory {os.path.join(self.archive_root, dst)}")
+                    self.rollback()
+                    raise
+                try:
+                    shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
+                    Migration.copied_files.append(os.path.join(self.archive_root, dst, fname))
+                except:
+                    print(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
+                    self.rollback()
+                    raise
+                if compress is None:
+                    self.results['null'].append({'pth': dst, 'fn':filename})#,
+                    self.paths['null'].append({'orig': items['path']})
+                else:
+                    self.results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})
+                    self.paths['comp'].append({'orig': items['path']})
+                done += 1
+                self.printProgressBar(done)
 
     def do_migration(self):
         """ Method to migrate the data
@@ -233,10 +235,10 @@ class Migration:
         path.mkdir(parents=True, exist_ok=True)
         if not self.check_permissions(files_from_db):
             return 0
-        if self.stop:
+        if Migration.stop:
             return 1
         self.migrate(files_from_db)
-        if self.stop:
+        if Migration.stop:
             return 1
         print("\n\nUpdating database...")
         try:
@@ -254,7 +256,7 @@ class Migration:
             self.rollback()
             raise
         # get new file info from db
-        if self.stop:
+        if Migration.stop:
             return 1
         print("Running comparison of new files and database...")
         files_from_db, db_duplicates = dbutils.get_files_from_db(self.dbh, newpath, self.archive, pfwid, None, debug=self.debug)
@@ -291,7 +293,7 @@ class Migration:
         for i, item in enumerate(self.results['null']):
             fname = item['fn']
             rml.append(os.path.join(self.archive_root, self.paths['null'][i]['orig'], fname))
-        if self.stop:
+        if Migration.stop:
             return 1
         #print('\n\n')
         #for r in rml:
@@ -304,7 +306,7 @@ class Migration:
             if not self.force:
                 res = input("Delete files in the above directory[y/n]?")
             if res.lower() == 'y' or self.force:
-                self.status = 1
+                Migration.status = 1
                 self.dbh.commit()
                 self.printProgressBar(0)
                 for i, r in enumerate(rml):
@@ -340,9 +342,9 @@ class Migration:
         length = len(self.pfwids)
 
         for i, pdwi in enumerate(self.pfwids):
-            if self.stop:
+            if Migration.stop:
                 return
-            self.copied_files = []
+            Migration.copied_files = []
             self.results = {"null": [],
                             "comp": []}
             self.paths = {"null": [],
@@ -354,7 +356,7 @@ class Migration:
             self.do_migration()
 
     def interrupt(self, signum, frame):
-        if self.status != 0:
+        if Migration.status != 0:
             print("The process cannot be interrupted at this stage")
             return
         self.rollback(self.currnewpath)
