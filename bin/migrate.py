@@ -87,14 +87,14 @@ def main():
         stdp = compare.Print(args.log)
         sys.stdout = stdp
     migrate = mu.Migration(args)
-    ret = migrate.go()
+    migrate.go()
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()
     end = datetime.datetime.now()
     duration = end - start
     print(f"\nJob took {duration.total_seconds():.1f} seconds")
-    sys.exit(ret)
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

@@ -316,12 +316,10 @@ class Migration:
             -------
             A summary of the results of do_migration
         """
-        count = 0
         length = len(self.pfwids)
 
         for i, pdwi in enumerate(self.pfwids):
             print(f"--------------------- Starting {pdwi}    {i + 1:d}/{length:d} ---------------------")
             self.pfwid = pdwi
             self.args.pfwid = pdwi
-            count += self.do_migration()
-        return count
+            self.do_migration()
