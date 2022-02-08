@@ -112,7 +112,7 @@ def determine_ids(args):
                 whereclause.append(f"attnum={args.attnum}")
         elif args.tag:
             whereclause.append(f"id in (select pfw_attempt_id from proctag where tag='{args.tag}')")
-        pfwids = dbutils.get_pfw_attempt_ids_where(dbh, whereclause, 'id')
+        pfwids = dbutils.get_pfw_attempt_ids_where(args.dbh, whereclause, 'id')
 
         if not args.silent:
             print(f"Found {len(pfwids):d} pfw_attempt_id's for the given date range (and any qualifying tag/reqnum)")
@@ -120,10 +120,10 @@ def determine_ids(args):
         pfwids = []
         # if dealing with a tag then get the relevant pfw_attempt_ids
         if args.tag:
-            pfwids = dbutils.get_pfw_attempt_id_from_tag(dbh, args.tag)
+            pfwids = dbutils.get_pfw_attempt_id_from_tag(args.dbh, args.tag)
         # if dealing with a triplet
         elif args.reqnum:
-            pfwids = dbutils.get_pfw_attempt_ids_from_triplet(dbh, args)
+            pfwids = dbutils.get_pfw_attempt_ids_from_triplet(args.dbh, args)
             args.reqnum = None
             args.unitname = None
             args.attnum = None
@@ -384,16 +384,16 @@ def run_compare(args):
     if args.date_range:
         if not pfwids:
             return 0
-        return multi_compare(dbh, pfwids, args)
+        return multi_compare(args.dbh, pfwids, args)
 
     # if only a single comparison was requested (single pfw_attempt_id, triplet (reqnum, uniname, attnum), or path)
     if not pfwids:
-        return do_compare(dbh, args)
+        return do_compare(args.dbh, args)
     if len(pfwids) == 1:
         args.pfwid = pfwids[0]
-        return do_compare(dbh, args)
+        return do_compare(args.dbh, args)
     pfwids.sort() # put them in order
-    return multi_compare(dbh, pfwids, args)
+    return multi_compare(args.dbh, pfwids, args)
 
 def do_compare(dbh, args):
     """ Main control """
