@@ -4,6 +4,7 @@
 """
 import sys
 import argparse
+import datetime
 import filemgmt.compare_utils as compare
 from filemgmt import migrate_utils as mu
 
@@ -73,6 +74,7 @@ def main():
     """ Main program module
 
     """
+    start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
     if args.date_range:
         print("Date ranges cannot be used with the migration script")
@@ -88,6 +90,9 @@ def main():
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()
+    end = datetime.datetime.now()
+    duration = end - start
+    print(f"Job took {duration.total_seconds():.1f} seconds")
     sys.exit(ret)
 
 if __name__ == "__main__":
