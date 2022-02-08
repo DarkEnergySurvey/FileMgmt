@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+""" Module to migrate files from one archive location to another, keeping the DB consistent.
 
+"""
 import sys
 import argparse
 import filemgmt.compare_utils as compare
-from filemgmt import migrate
+from filemgmt import migrate_utils as mu
 
 def parse_cmd_line(argv):
     """ Parse command line arguments
@@ -45,7 +47,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--section', '-s', action='store', help='Must be specified if DES_DB_SECTION is not set in environment')
     parser.add_argument('--archive', action='store', default='desar2home', help='archive_name from file_archive_info table for the files to be moved')
     parser.add_argument('--destination', action='store', required=True, help='Destination folder for the files.')
-    parser.add_argument('--current', action='store', default=None, help='Section of the current path that will be replaces by the `destination` path. For example --current=\'OPS/\' --destination=\'taiga/\' will move the selected files from <archive root>/OPS to <archive root>/taiga. If left empy the `destinataion` will be prepended to the current directory --destination=\'taiga/\' will move the selected files from <archive root>/ to <archive root>/taiga.')
+    parser.add_argument('--current', action='store', default=None, help='Section of the current path that will be replaced by the `destination` path. Examples:\n   --current=\'OPS/\' --destination=\'taiga/\' will move the selected files from <archive root>/OPS to <archive root>/taiga.\n   If left empy the `destinataion` will be prepended to the current directory --destination=\'taiga/\' will move the selected files from <archive root>/ to <archive root>/taiga.\n   --current=\'Y5A1/\' --destination=\'Y5A1_taiga/\' will move <archive root>/OPS/finalcut/Y5A1/XYZ/p02 to <archive root>/OPS/finalcut/Y5A1_taiga/XYZ/p02')
     parser.add_argument('--reqnum', action='store', help='Request number to search for')
     parser.add_argument('--relpath', action='store', help='relative path on disk within archive (no archive root)')
     parser.add_argument('--unitname', action='store', help='Unit name to search for')
@@ -55,11 +57,11 @@ The following are all valid ways to select the files:
     parser.add_argument('--script', action='store_true', help='Print only if there are errors, usefule for running in loops in scripts')
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
-    parser.add_argument('--date_range', action='store', help='Date range of submit time in YYYY-MM-DD format. If date is given then only data from that date are checked, if two comma separated dates are given then all data from between those dates (inclusive) are checked.')
+    parser.add_argument('--date_range', action='store', help='Not used')
     #parser.add_argument('--pipeline', action='store', help='Compare data from a specific pipeline (subpipeprod in pfw_attempt), only used in conjunction with date_range')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
-    parser.add_argument('--start_at', action='store', help='Index to start at (1 based), useful for doing checking in chunks.', type=int, default=1)
-    parser.add_argument('--end_at', action='store', help='Index to end at (1 based), useful for doing checking in chunks.', type=int, default=0)
+    parser.add_argument('--start_at', action='store', help='Not used', type=int, default=1)
+    parser.add_argument('--end_at', action='store', help='Not used', type=int, default=0)
     parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     cargs = parser.parse_args(argv)
@@ -72,10 +74,17 @@ def main():
 
     """
     args = parse_cmd_line(sys.argv[1:])
+    if args.date_range:
+        print("Date ranges cannot be used with the migration script")
+        return
+    if args.start_at != 1 or args.end_at != 0:
+        print("start_at and end_at cannot be used with the migration script")
+        return
     if args.log is not None:
         stdp = compare.Print(args.log)
         sys.stdout = stdp
-    ret = migrate.run_migration(args)
+    migrate = mu.Migration(args)
+    ret = migrate.go()
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()
