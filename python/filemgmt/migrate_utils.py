@@ -36,7 +36,7 @@ class Migration:
     """ Class for migrating data
 
     """
-    lock = threading.lock()
+    lock = threading.Lock()
     copied_files = []
     stop = False
     status = 0
