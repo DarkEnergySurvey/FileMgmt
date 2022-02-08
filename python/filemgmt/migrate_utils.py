@@ -85,7 +85,7 @@ class Migration:
             return
         self.stop = True
         print("\nRolling back any changes...\n")
-        time.sleep(1.5)
+        time.sleep(5)
         if self.dbh:
             self.dbh.rollback()
         bad_files = []
