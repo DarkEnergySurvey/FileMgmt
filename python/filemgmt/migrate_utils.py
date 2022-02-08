@@ -322,5 +322,6 @@ class Migration:
         for i, pdwi in enumerate(self.pfwids):
             print(f"--------------------- Starting {pdwi}    {i + 1:d}/{length:d} ---------------------")
             self.pfwid = pdwi
+            self.args.pfwid = pdwi
             count += self.do_migration()
         return count
