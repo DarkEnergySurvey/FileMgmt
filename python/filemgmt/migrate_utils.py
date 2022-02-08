@@ -61,6 +61,8 @@ class Migration:
         self.paths = {"null": [],
                       "comp": []}
         self.count = 0
+        self.stop = False
+        self.status = 0
 
     def __del__(self):
         if self.dbh:
@@ -77,6 +79,9 @@ class Migration:
     def rollback(self, newpath=None):
         """ Method to undo any changes if something goes wrong
         """
+        if self.stop:
+            return
+        self.stop = True
         print("\nRolling back any changes...\n")
         if self.dbh:
             self.dbh.rollback()
@@ -124,6 +129,8 @@ class Migration:
         self.printProgressBar(0)
         done = 0
         for fname, items in files_from_db.items():
+            if self.stop:
+                return False
             if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
                 bad_files.append(fname)
             done += 1
@@ -157,6 +164,8 @@ class Migration:
         done = 0
         self.printProgressBar(0)
         for fname, items in files_from_db.items():
+            if self.stop:
+                return
             if self.current is not None:
                 dst = items['path'].replace(self.current, self.destination)
             else:
@@ -220,7 +229,11 @@ class Migration:
         path.mkdir(parents=True, exist_ok=True)
         if not self.check_permissions(files_from_db):
             return 0
+        if self.stop:
+            return 1
         self.migrate(files_from_db)
+        if self.stop:
+            return 1
         print("\n\nUpdating database...")
         try:
             if self.results['comp'] :
@@ -237,7 +250,8 @@ class Migration:
             self.rollback()
             raise
         # get new file info from db
-
+        if self.stop:
+            return 1
         print("Running comparison of new files and database...")
         files_from_db, db_duplicates = dbutils.get_files_from_db(self.dbh, newpath, self.archive, pfwid, None, debug=self.debug)
         files_from_disk, duplicates = diskutils.get_files_from_disk(newpath, self.archive_root, True, self.debug)
@@ -273,7 +287,8 @@ class Migration:
         for i, item in enumerate(self.results['null']):
             fname = item['fn']
             rml.append(os.path.join(self.archive_root, self.paths['null'][i]['orig'], fname))
-
+        if self.stop:
+            return 1
         #print('\n\n')
         #for r in rml:
         #    print(r)
@@ -285,6 +300,7 @@ class Migration:
             if not self.force:
                 res = input("Delete files in the above directory[y/n]?")
             if res.lower() == 'y' or self.force:
+                self.status = 1
                 self.dbh.commit()
                 self.printProgressBar(0)
                 for i, r in enumerate(rml):
@@ -320,6 +336,8 @@ class Migration:
         length = len(self.pfwids)
 
         for i, pdwi in enumerate(self.pfwids):
+            if self.stop:
+                return
             self.copied_files = []
             self.results = {"null": [],
                             "comp": []}
@@ -332,4 +350,7 @@ class Migration:
             self.do_migration()
 
     def interrupt(self, signum, frame):
+        if self.status != 0:
+            print("The process cannot be interrupted at this stage")
+            return
         self.rollback()
