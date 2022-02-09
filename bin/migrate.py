@@ -75,6 +75,10 @@ The following are all valid ways to select the files:
         cargs.verbose = False
     return cargs
 
+def run(inputs):
+    (args, pfwids, event) = inputs
+    mu.Migration(args, pfwids, event)
+
 def main():
     """ Main program module
 
@@ -114,7 +118,7 @@ def main():
             pos += count
         jobs.append(pfwids[pos:])
         with mp.Pool(processes=len(jobs), maxtasksperchild=10) as pool:
-            _ = [pool.apply_async(mu.Migration, args=((copy.deepcopy(args), jobs[i], event,),)) for i in range(len(jobs))]
+            _ = [pool.apply_async(run, args=((copy.deepcopy(args), jobs[i], event,),)) for i in range(len(jobs))]
             pool.close()
             pool.join()
 
