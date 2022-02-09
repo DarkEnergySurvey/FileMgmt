@@ -87,6 +87,8 @@ class Migration:
             self.dbh.close()
 
     def check_status(self):
+        """ Method to check whether the processing should continue
+        """
         if self.halt:
             return True
         if self.event is not None:

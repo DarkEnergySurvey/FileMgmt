@@ -76,6 +76,8 @@ The following are all valid ways to select the files:
     return cargs
 
 def run(inputs):
+    """ Method to launch a multiprocessing run
+    """
     (args, pfwids, event) = inputs
     mu.Migration(args, pfwids, event)
 
