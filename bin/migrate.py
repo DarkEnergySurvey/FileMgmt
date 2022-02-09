@@ -81,6 +81,11 @@ def run(inputs):
     (args, pfwids, event) = inputs
     mu.Migration(args, pfwids, event)
 
+def results_error(err):
+    print("Exception raised:")
+    print(err)
+    raise err
+
 def main():
     """ Main program module
 
@@ -96,7 +101,8 @@ def main():
         stdp = compare.Print(args.log)
         sys.stdout = stdp
     (args, pfwids) = compare.determine_ids(args)
-    event = mp.Event()
+    manager = mp.Manager()
+    event = manager.Event()
 
     def interrupt(x, y):
         event.set()
@@ -120,7 +126,7 @@ def main():
             pos += count
         jobs.append(pfwids[pos:])
         with mp.Pool(processes=len(jobs), maxtasksperchild=10) as pool:
-            _ = [pool.apply_async(run, args=((copy.deepcopy(args), jobs[i], event,),)) for i in range(len(jobs))]
+            _ = [pool.apply_async(run, args=((copy.deepcopy(args), jobs[i], event,),), error_callback=results_error) for i in range(len(jobs))]
             pool.close()
             pool.join()
 

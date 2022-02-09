@@ -76,6 +76,7 @@ class Migration:
             _ = self.do_migration()
         elif len(self.pfwids) == 1:
             self.pfwid = self.pfwids[0]
+            self.args.pfwid = self.pfwid
             _ = self.do_migration()
         else:
             self.pfwids.sort() # put them in order
@@ -120,10 +121,10 @@ class Migration:
         if self.dbh:
             self.dbh.rollback()
         bad_files = []
-        self.count = len(Migration.copied_files)
+        self.count = len(self.copied_files)
         if self.count > 0:
             self.printProgressBar(0)
-            for i, f in enumerate(Migration.copied_files):
+            for i, f in enumerate(self.copied_files):
                 try:
                     os.remove(f)
                     self.printProgressBar(i+1)
@@ -196,7 +197,7 @@ class Migration:
                 raise
             try:
                 shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
-                Migration.copied_files.append(os.path.join(self.archive_root, dst, fname))
+                self.copied_files.append(os.path.join(self.archive_root, dst, fname))
             except:
                 print(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
                 self.rollback()
@@ -356,7 +357,7 @@ class Migration:
         for i, pdwi in enumerate(self.pfwids):
             if self.check_status():
                 return
-            Migration.copied_files = []
+            self.copied_files = []
             self.results = {"null": [],
                             "comp": []}
             self.paths = {"null": [],
