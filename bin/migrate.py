@@ -4,8 +4,11 @@
 """
 import sys
 import argparse
-import datetime
 import signal
+import math
+import copy
+import multiprocessing as mp
+
 import filemgmt.compare_utils as compare
 from filemgmt import migrate_utils as mu
 
@@ -60,13 +63,13 @@ The following are all valid ways to select the files:
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
     parser.add_argument('--date_range', action='store', help='Not used')
-    #parser.add_argument('--pipeline', action='store', help='Compare data from a specific pipeline (subpipeprod in pfw_attempt), only used in conjunction with date_range')
     parser.add_argument('--force', action='store_true', help='Do not ask to delete files, just do it')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
     parser.add_argument('--start_at', action='store', help='Not used', type=int, default=1)
     parser.add_argument('--end_at', action='store', help='Not used', type=int, default=0)
     parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
+    parser.add_argument('--parallel', action='store', help='Specify the parallelization of the migration, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False
@@ -76,7 +79,6 @@ def main():
     """ Main program module
 
     """
-    start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
     if args.date_range:
         print("Date ranges cannot be used with the migration script")
@@ -87,15 +89,39 @@ def main():
     if args.log is not None:
         stdp = compare.Print(args.log)
         sys.stdout = stdp
-    migrate = mu.Migration(args)
-    signal.signal(signal.SIGINT, migrate.interrupt)
-    migrate.go()
+    (args, pfwids) = compare.determine_ids(args)
+    event = mp.Event()
+
+    def interrupt(x, y):
+        event.set()
+
+    signal.signal(signal.SIGINT, interrupt)
+
+    if args.parallel <= 1:
+        _ = mu.Migration(args, pfwids, event)
+    else:
+        args.dbh.close()
+        args.dbh = None
+        rem = len(pfwids)%args.parallel
+        if rem < args.parallel/2:
+            count = math.ceil(len(pfwids)/args.parallel)
+        else:
+            count = int(len(pfwids)/args.parallel)
+        jobs = []
+        pos = 0
+        while pos < len(pfwids) - count:
+            jobs.append(pfwids[pos:pos+count])
+            pos += count
+        jobs.append(pfwids[pos:])
+        with mp.Pool(processes=len(jobs), maxtasksperchild=10) as pool:
+            _ = [pool.apply_async(mu.Migration, args=((copy.deepcopy(args), jobs[i], event,),)) for i in range(len(jobs))]
+            pool.close()
+            pool.join()
+
+
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()
-    end = datetime.datetime.now()
-    duration = end - start
-    print(f"\nJob took {duration.total_seconds():.1f} seconds")
     sys.exit(0)
 
 if __name__ == "__main__":

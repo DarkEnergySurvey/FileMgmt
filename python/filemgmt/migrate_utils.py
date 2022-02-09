@@ -5,13 +5,13 @@
 import os
 import shutil
 from pathlib import Path
-import time
+import datetime
 
 from despymisc import miscutils
+from despydmdb import desdmdbi
 import filemgmt.disk_utils_local as diskutils
 import filemgmt.db_utils_local as dbutils
 import filemgmt.compare_utils as compare
-
 
 def removeEmptyFolders(path, removeRoot=True):
     """ Function to remove empty folders
@@ -36,11 +36,12 @@ class Migration:
     """ Class for migrating data
 
     """
-    copied_files = []
-    stop = False
-    status = 0
-    def __init__(self, args):
-        (self.args, self.pfwids) = compare.determine_ids(args)
+    def __init__(self, args, pfwids, event=None):
+        self.pfwids = pfwids
+        if args.dbh is None:
+            args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
+        self.args = args
+        self.event = event
         self.dbh = self.args.dbh
         self.des_services = self.args.des_services
         self.section = self.args.section
@@ -59,20 +60,45 @@ class Migration:
         self.tag = self.args.tag
         self.archive_root = None
         self.force = args.force
+        self.mproc = args.parallel > 1
+        self.silent = args.silent or self.mproc
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
                       "comp": []}
         self.count = 0
         self.currnewpath = None
+        self.copied_files = []
+        self.status = 0
+        self.halt = False
+
+        if not self.pfwids:
+            _ = self.do_migration()
+        elif len(self.pfwids) == 1:
+            self.pfwid = self.pfwids[0]
+            _ = self.do_migration()
+        else:
+            self.pfwids.sort() # put them in order
+            self.multi_migrate()
+
 
     def __del__(self):
         if self.dbh:
             self.dbh.close()
 
+    def check_status(self):
+        if self.halt:
+            return True
+        if self.event is not None:
+            if self.event.is_set():
+                self.rollback(self.currnewpath)
+        return self.halt
+
     def printProgressBar(self, iteration, length = 100, fill = '█', printEnd = "\r"):
         """ Print a progress bar
         """
+        if self.silent:
+            return
         percent = (f"{iteration:d}/{self.count:d}")
         filledLength = int(length * iteration // self.count)
         pbar = fill * filledLength + '-' * (length - filledLength)
@@ -81,11 +107,14 @@ class Migration:
     def rollback(self, newpath=None):
         """ Method to undo any changes if something goes wrong
         """
-        if Migration.stop:
+        if self.halt:
             return
-        Migration.stop = True
+        self.halt = True
+        if self.status != 0:
+            print("The process cannot be interrupted at this stage")
+            return
+
         print("\nRolling back any changes...\n")
-        time.sleep(5)
         if self.dbh:
             self.dbh.rollback()
         bad_files = []
@@ -105,24 +134,6 @@ class Migration:
                 for f in bad_files:
                     print(f"    {f}")
 
-    def go(self):
-        """ Method to migrate the files
-        """
-        # if dealing with a date range then get the relevant pfw_attempt_ids
-        #if args.date_range:
-        #    if not pfwids:
-        #        return 0
-        #    return multi_migrate(args.dbh, pfwids, args)
-
-        # if only a single comparison was requested (single pfw_attempt_id, triplet (reqnum, uniname, attnum), or path)
-        if not self.pfwids:
-            return self.do_migration()
-        if len(self.pfwids) == 1:
-            self.pfwid = self.pfwids[0]
-            return self.do_migration()
-        self.pfwids.sort() # put them in order
-        return self.multi_migrate()
-
     def check_permissions(self, files_from_db):
         """ Check the permissions of the initial files to make sure they can be read and written
         """
@@ -132,7 +143,7 @@ class Migration:
         self.printProgressBar(0)
         done = 0
         for fname, items in files_from_db.items():
-            if Migration.stop:
+            if self.check_status():
                 return False
             if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
                 bad_files.append(fname)
@@ -167,7 +178,7 @@ class Migration:
         done = 0
         self.printProgressBar(0)
         for fname, items in files_from_db.items():
-            if Migration.stop:
+            if self.check_status():
                 return
             if self.current is not None:
                 dst = items['path'].replace(self.current, self.destination)
@@ -233,10 +244,10 @@ class Migration:
         path.mkdir(parents=True, exist_ok=True)
         if not self.check_permissions(files_from_db):
             return 0
-        if Migration.stop:
+        if self.check_status():
             return 1
         self.migrate(files_from_db)
-        if Migration.stop:
+        if self.check_status():
             return 1
         print("\n\nUpdating database...")
         try:
@@ -254,7 +265,7 @@ class Migration:
             self.rollback()
             raise
         # get new file info from db
-        if Migration.stop:
+        if self.check_status():
             return 1
         print("Running comparison of new files and database...")
         files_from_db, db_duplicates = dbutils.get_files_from_db(self.dbh, newpath, self.archive, pfwid, None, debug=self.debug)
@@ -291,7 +302,7 @@ class Migration:
         for i, item in enumerate(self.results['null']):
             fname = item['fn']
             rml.append(os.path.join(self.archive_root, self.paths['null'][i]['orig'], fname))
-        if Migration.stop:
+        if self.check_status():
             return 1
         #print('\n\n')
         #for r in rml:
@@ -304,7 +315,7 @@ class Migration:
             if not self.force:
                 res = input("Delete files in the above directory[y/n]?")
             if res.lower() == 'y' or self.force:
-                Migration.status = 1
+                self.status = 1
                 self.dbh.commit()
                 self.printProgressBar(0)
                 for i, r in enumerate(rml):
@@ -315,6 +326,7 @@ class Migration:
                         cannot_del.append(r)
                 removeEmptyFolders(os.path.join(self.archive_root,relpath))
                 ok = True
+                self.status = 0
             elif res.lower() == 'n':
                 self.rollback(newpath)
                 return 0
@@ -340,7 +352,7 @@ class Migration:
         length = len(self.pfwids)
 
         for i, pdwi in enumerate(self.pfwids):
-            if Migration.stop:
+            if self.check_status():
                 return
             Migration.copied_files = []
             self.results = {"null": [],
@@ -349,12 +361,12 @@ class Migration:
                           "comp": []}
             self.count = 0
             print(f"--------------------- Starting {pdwi}    {i + 1:d}/{length:d} ---------------------")
+            start = datetime.datetime.now()
             self.pfwid = pdwi
             self.args.pfwid = pdwi
             self.do_migration()
+            end = datetime.datetime.now()
+            duration = end - start
+            print(f"\nJob took {duration.total_seconds():.1f} seconds")
 
-    def interrupt(self, signum, frame):
-        if Migration.status != 0:
-            print("The process cannot be interrupted at this stage")
-            return
-        self.rollback(self.currnewpath)
+            print(f"--------------------- {pdwi}  Completed in {duration.total_seconds():.1f} sec ---------------------")
