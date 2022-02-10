@@ -34,6 +34,8 @@ def removeEmptyFolders(path, removeRoot=True):
         os.rmdir(path)
 
 class Message:
+    """ Class for passing messages to main process
+    """
     def __init__(self, window, msg, pfwid, iteration=None, count=None, err=False):
         self.win = window
         self.msg = msg
@@ -72,8 +74,8 @@ class Migration:
         self.tag = self.args.tag
         self.archive_root = None
         self.force = args.force
-        self.mproc = args.parallel > 1
-        self.silent = args.silent or self.mproc
+        #self.mproc = args.parallel > 1
+        #self.silent = args.silent or self.mproc
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
@@ -85,7 +87,7 @@ class Migration:
         self.iteration = 0
         self.halt = False
         self.number = 0
-        self.length = 0
+        self.length = 1
 
         if not self.pfwids:
             _ = self.do_migration()
@@ -103,11 +105,14 @@ class Migration:
             self.dbh.close()
 
     def update(self, msg=None, err=False):
+        """ Method to report the progress of the job
+
+        """
         if self.silent:
             return
         if self.que is not None:
             if msg is not None:
-                self.que.put_nowait(Message(self.win, f"Processing {self.pfwid}  ({self.number+1}/{self.length}\n{msg}", pfwid=self.pfwid, err=err))
+                self.que.put_nowait(Message(self.win, f"Processing {self.pfwid}  ({self.number+1}/{self.length})\n{msg}", pfwid=self.pfwid, err=err))
             else:
                 self.que.put_nowait(Message(self.win, None, self.pfwid, self.iteration, self.count))
         else:
@@ -356,6 +361,7 @@ class Migration:
             if res.lower() == 'y' or self.force:
                 self.status = 1
                 self.dbh.commit()
+                self.update("Removing original files")
                 self.iteration = 0
                 self.update()
                 for i, r in enumerate(rml):

@@ -11,6 +11,7 @@ import curses
 import queue
 import time
 import multiprocessing as mp
+import datetime
 
 import filemgmt.compare_utils as compare
 from filemgmt import migrate_utils as mu
@@ -30,7 +31,6 @@ def parse_cmd_line(argv):
     """
     epilog = """\
 The files to be migrated can be specified in multiple ways:
-    - relpath will select all files at or below the given path
     - reqnum will select all files of a given reqnum
       - unitname (must also have a reqnum supplied) will select all files from the given
         reqnum/unitname
@@ -59,7 +59,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--destination', action='store', required=True, help='Destination folder for the files.')
     parser.add_argument('--current', action='store', default=None, help='Section of the current path that will be replaced by the `destination` path. Examples:\n   --current=\'OPS/\' --destination=\'taiga/\' will move the selected files from <archive root>/OPS to <archive root>/taiga.\n   If left empy the `destinataion` will be prepended to the current directory --destination=\'taiga/\' will move the selected files from <archive root>/ to <archive root>/taiga.\n   --current=\'Y5A1/\' --destination=\'Y5A1_taiga/\' will move <archive root>/OPS/finalcut/Y5A1/XYZ/p02 to <archive root>/OPS/finalcut/Y5A1_taiga/XYZ/p02')
     parser.add_argument('--reqnum', action='store', help='Request number to search for')
-    parser.add_argument('--relpath', action='store', help='relative path on disk within archive (no archive root)')
+    parser.add_argument('--relpath', action='store', help='Not used')
     parser.add_argument('--unitname', action='store', help='Unit name to search for')
     parser.add_argument('--attnum', action='store', help='Attempt number to search for')
     parser.add_argument('--verbose', action='store_true', help='print differences between db and disk')
@@ -86,18 +86,20 @@ def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd
     percent = (f"{iteration:d}/{count:d}")
     filledLength = int(length * iteration // count)
     pbar = fill * filledLength + '-' * (length - filledLength)
-    win.addstr(2, 0, f'\rProgress: |{pbar}| {percent}', end = printEnd)
+    win.addstr(2, 0, f"Progress: |{pbar}| {percent}{printEnd}")
 
 def run(inputs):
     """ Method to launch a multiprocessing run
     """
     try:
         (wn, args, pfwids, event, que) = inputs
-        mu.Migration(args, pfwids, event, que)
+        mu.Migration(wn, args, pfwids, event, que)
     finally:
         que.put_nowait(mu.Message(wn, COMPLETE, 0))
 
 def results_error(err):
+    """ Error handling routine
+    """
     print("Exception raised:")
     print(err)
     raise err
@@ -106,12 +108,16 @@ def main():
     """ Main program module
 
     """
+    start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
     if args.date_range:
         print("Date ranges cannot be used with the migration script")
         return
     if args.start_at != 1 or args.end_at != 0:
         print("start_at and end_at cannot be used with the migration script")
+        return
+    if args.relpath:
+        print("relpath cannot be used with migration script")
         return
     if args.log is not None:
         stdp = compare.Print(args.log)
@@ -128,6 +134,8 @@ def main():
     if args.parallel <= 1:
         _ = mu.Migration(0, args, pfwids, event)
     else:
+        if args.parallel > 6:
+            args.parallel = 6
         args.dbh.close()
         args.dbh = None
         rem = len(pfwids)%args.parallel
@@ -166,10 +174,12 @@ def main():
                                 if ms.pfwid not in errors:
                                     errors[ms.pfwid] = []
                                 errors[ms.pfwid].append(ms.msg)
+                                continue
                             if ms.msg == COMPLETE:
                                 done[ms.win] = True
-                                continue
-                            if ms.msg is not None:
+                                wins[ms.win].clear()
+                                wins[ms.win].addstr("Complete\n")
+                            elif ms.msg is not None:
                                 wins[ms.win].clear()
                                 wins[ms.win].addstr(ms.msg + '\n')
                             else:
@@ -190,6 +200,9 @@ def main():
         else:
             print("All tasks accomplished")
 
+    end = datetime.datetime.now()
+    duration = end-start
+    print(f"\nJob took {duration.total_seconds():.1f} seconds")
 
     if args.log is not None:
         sys.stdout.flush()
