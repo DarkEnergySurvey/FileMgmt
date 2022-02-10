@@ -7,10 +7,15 @@ import argparse
 import signal
 import math
 import copy
+import curses
+import queue
+import time
 import multiprocessing as mp
 
 import filemgmt.compare_utils as compare
 from filemgmt import migrate_utils as mu
+
+COMPLETE = "Complete"
 
 def parse_cmd_line(argv):
     """ Parse command line arguments
@@ -75,11 +80,22 @@ The following are all valid ways to select the files:
         cargs.verbose = False
     return cargs
 
+def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd = "\n"):
+    """ Print a progress bar
+    """
+    percent = (f"{iteration:d}/{count:d}")
+    filledLength = int(length * iteration // count)
+    pbar = fill * filledLength + '-' * (length - filledLength)
+    win.addstr(2, 0, f'\rProgress: |{pbar}| {percent}', end = printEnd)
+
 def run(inputs):
     """ Method to launch a multiprocessing run
     """
-    (args, pfwids, event) = inputs
-    mu.Migration(args, pfwids, event)
+    try:
+        (wn, args, pfwids, event, que) = inputs
+        mu.Migration(args, pfwids, event, que)
+    finally:
+        que.put_nowait(mu.Message(wn, COMPLETE, 0))
 
 def results_error(err):
     print("Exception raised:")
@@ -110,7 +126,7 @@ def main():
     signal.signal(signal.SIGINT, interrupt)
 
     if args.parallel <= 1:
-        _ = mu.Migration(args, pfwids, event)
+        _ = mu.Migration(0, args, pfwids, event)
     else:
         args.dbh.close()
         args.dbh = None
@@ -125,10 +141,54 @@ def main():
             jobs.append(pfwids[pos:pos+count])
             pos += count
         jobs.append(pfwids[pos:])
-        with mp.Pool(processes=len(jobs), maxtasksperchild=10) as pool:
-            _ = [pool.apply_async(run, args=((copy.deepcopy(args), jobs[i], event,),), error_callback=results_error) for i in range(len(jobs))]
-            pool.close()
-            pool.join()
+        manager = mp.Manager()
+        queu = manager.Queue()
+        done = [False] * len(jobs)
+        wins = []
+        errors = {}
+        try:
+            stdscr = curses.initscr()
+            curses.cbreak()
+            num_rows, num_cols = stdscr.getmaxyx()
+            step = math.floor(num_rows/len(jobs))
+            for i in range(len(jobs)):
+                wins.append(curses.newwin(step, num_cols, i*step, 0))
+
+            with mp.Pool(processes=len(jobs), maxtasksperchild=1) as pool:
+                _ = [pool.apply_async(run, args=((i, copy.deepcopy(args), jobs[i], event, queu,),), error_callback=results_error) for i in range(len(jobs))]
+                pool.close()
+                #pool.join()
+                while not all(done):
+                    while True:
+                        try:
+                            ms = queu.get_nowait()
+                            if ms.err:
+                                if ms.pfwid not in errors:
+                                    errors[ms.pfwid] = []
+                                errors[ms.pfwid].append(ms.msg)
+                            if ms.msg == COMPLETE:
+                                done[ms.win] = True
+                                continue
+                            if ms.msg is not None:
+                                wins[ms.win].clear()
+                                wins[ms.win].addstr(ms.msg + '\n')
+                            else:
+                                printProgressBar(wins[ms.win], ms.iteration, ms.count)
+                            wins[ms.win].refresh()
+                        except queue.Empty:
+                            break
+                    time.sleep(0.2)
+        finally:
+            curses.endwin()
+        if errors:
+            print(f"Issues were encountered in {len(errors)}/{len(pfwids)} jobs.")
+            for pid, msgs in errors.items():
+                print(f"pfwid: {pid}")
+                for m in msgs:
+                    m = m.strip()
+                    print(f"   {m}")
+        else:
+            print("All tasks accomplished")
 
 
     if args.log is not None:
