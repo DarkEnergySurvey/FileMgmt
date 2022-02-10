@@ -73,9 +73,6 @@ class Migration:
         self.silent = self.args.silent
         self.tag = self.args.tag
         self.archive_root = None
-        self.force = args.force
-        #self.mproc = args.parallel > 1
-        #self.silent = args.silent or self.mproc
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
@@ -151,7 +148,7 @@ class Migration:
             self.update("The process cannot be interrupted at this stage")
             return
 
-        self.update("\nRolling back any changes...\n")
+        self.update("Rolling back any changes...")
         if self.dbh:
             self.dbh.rollback()
         bad_files = []
@@ -171,7 +168,7 @@ class Migration:
             if bad_files:
                 with open(f"{self.pfwid}.undel", 'w', encoding="utf-8") as fh:
                     for f in bad_files:
-                        fh.write(f"    {f}")
+                        fh.write(f"    {f}\n")
                 self.update(f"Could not remove {len(bad_files)} copied files. See {self.pfwid}.undel for a list.", True)
 
     def check_permissions(self, files_from_db):
@@ -230,7 +227,7 @@ class Migration:
             try:
                 path.mkdir(parents=True, exist_ok=True)
             except:
-                self.update(f"\nError making directory {os.path.join(self.archive_root, dst)}", True)
+                self.update(f"Error making directory {os.path.join(self.archive_root, dst)}", True)
                 time.sleep(2)
                 self.rollback()
                 raise
@@ -238,7 +235,7 @@ class Migration:
                 shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
                 self.copied_files.append(os.path.join(self.archive_root, dst, fname))
             except:
-                self.update(f"\nError copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
+                self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
                 time.sleep(2)
                 self.rollback()
                 raise
@@ -277,11 +274,10 @@ class Migration:
             return 1
         newarchpath = os.path.join(self.archive_root, newpath)
         self.currnewpath = newpath
-        #print archive_root
-        #if self.debug:
-        #    print("From DB")
+
         files_from_db, _ = dbutils.get_files_from_db(self.dbh, relpath, self.archive, pfwid, None, debug=self.debug)
         self.count = len(files_from_db)
+
         # make the root directory
         path = Path(newarchpath)
         path.mkdir(parents=True, exist_ok=True)
@@ -292,7 +288,7 @@ class Migration:
         self.migrate(files_from_db)
         if self.check_status():
             return 1
-        self.update("\n\nUpdating database...")
+        self.update("Updating database...")
         try:
             if self.results['comp'] :
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
@@ -333,10 +329,9 @@ class Migration:
             error = True
             self.update(f"Error {len(comparison_info['md5sum']):d} files have mismatched md5sums", True)
         if error:
-            #self.update("Error summary")
-            #self.update(compare.diff_files(comparison_info, files_from_db, files_from_disk, True, True, duplicates, db_duplicates), err=True)
             self.rollback()
             return 1
+
         # remove old files
         self.update("     Complete, all files match")
         rml = []
@@ -348,41 +343,29 @@ class Migration:
             rml.append(os.path.join(self.archive_root, self.paths['null'][i]['orig'], fname))
         if self.check_status():
             return 1
-        #print('\n\n')
-        #for r in rml:
-        #    print(r)
-        ok = False
-        #print(f"\n{os.path.join(self.archive_root,relpath)}\n")
+
         cannot_del = []
-        while not ok:
-            res = ""
-            if not self.force:
-                res = input("Delete files in the above directory[y/n]?")
-            if res.lower() == 'y' or self.force:
-                self.status = 1
-                self.dbh.commit()
-                self.update("Removing original files")
-                self.iteration = 0
+        self.status = 1
+        self.dbh.commit()
+        self.update("Removing original files")
+        self.iteration = 0
+        self.update()
+        for i, r in enumerate(rml):
+            try:
+                os.remove(r)
+                self.iteration = i + 1
                 self.update()
-                for i, r in enumerate(rml):
-                    try:
-                        os.remove(r)
-                        self.iteration = i + 1
-                        self.update()
-                    except:
-                        cannot_del.append(r)
-                removeEmptyFolders(os.path.join(self.archive_root,relpath))
-                ok = True
-                self.status = 0
-            elif res.lower() == 'n':
-                self.rollback(newpath)
-                return 0
-            #print()
+            except:
+                cannot_del.append(r)
+        removeEmptyFolders(os.path.join(self.archive_root,relpath))
+        self.status = 0
+
         if cannot_del:
             with open(f"{self.pfwid}.undel", 'w', encoding="utf-8") as fh:
                 for f in cannot_del:
-                    fh.write(f"    {f}")
+                    fh.write(f"    {f}\n")
             self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
+        return 0
 
     def multi_migrate(self):
         """ Method to iterate over pfw_attempt_id's and run the migration script
@@ -409,13 +392,7 @@ class Migration:
             self.paths = {"null": [],
                           "comp": []}
             self.count = 0
-            #print(f"--------------------- Starting {pdwi}    {i + 1:d}/{length:d} ---------------------")
-            #start = datetime.datetime.now()
+
             self.pfwid = pdwi
             self.args.pfwid = pdwi
             self.do_migration()
-            #end = datetime.datetime.now()
-            #duration = end - start
-            #print(f"\nJob took {duration.total_seconds():.1f} seconds")
-
-            #print(f"--------------------- {pdwi}  Completed in {duration.total_seconds():.1f} sec ---------------------")
