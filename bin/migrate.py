@@ -134,20 +134,20 @@ def main():
     if args.parallel <= 1:
         _ = mu.Migration(0, args, pfwids, event)
     else:
-        if args.parallel > 6:
-            args.parallel = 6
+        if args.parallel > 8:
+            args.parallel = 8
         args.dbh.close()
         args.dbh = None
-        rem = len(pfwids)%args.parallel
-        if rem < args.parallel/2:
-            count = math.ceil(len(pfwids)/args.parallel)
-        else:
-            count = int(len(pfwids)/args.parallel)
+        npids = len(pfwids)
         jobs = []
+        for _ in range(args.parallel):
+            jobs.append([])
         pos = 0
-        while pos < len(pfwids) - count:
-            jobs.append(pfwids[pos:pos+count])
-            pos += count
+        while pfwids:
+            jobs[pos].append(pfwids.pop())
+            pos += 1
+            if pos >= args.parallel:
+                pos = 0
         jobs.append(pfwids[pos:])
         manager = mp.Manager()
         queu = manager.Queue()
@@ -191,7 +191,7 @@ def main():
         finally:
             curses.endwin()
         if errors:
-            print(f"Issues were encountered in {len(errors)}/{len(pfwids)} jobs.")
+            print(f"Issues were encountered in {len(errors)}/{npids} jobs.")
             for pid, msgs in errors.items():
                 print(f"pfwid: {pid}")
                 for m in msgs:
