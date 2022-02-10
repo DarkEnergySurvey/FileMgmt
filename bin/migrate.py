@@ -148,7 +148,6 @@ def main():
             pos += 1
             if pos >= args.parallel:
                 pos = 0
-        jobs.append(pfwids[pos:])
         manager = mp.Manager()
         queu = manager.Queue()
         done = [False] * len(jobs)
