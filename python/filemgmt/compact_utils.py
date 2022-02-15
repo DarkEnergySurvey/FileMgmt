@@ -45,8 +45,8 @@ class CompactLogs:
     """
     def __init__(self, win, args, pfwids, event, que=None):
         self.pfwids = pfwids
-        if args.dbh is None:
-            args.dbh = fmdb.FileMgmtDB(args.des_services, args.section)
+        #if args.dbh is None:
+        args.dbh = fmdb.FileMgmtDB(args.des_services, args.section)
         args.dbh.dynam_load_ftmgmt()
 
         self.args = args
