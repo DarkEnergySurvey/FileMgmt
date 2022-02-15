@@ -53,7 +53,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--attnum', action='store', help='Not used, but maintined for code compatability.')
     parser.add_argument('--verbose', action='store_true', help='print differences between db and disk')
     parser.add_argument('--debug', action='store_true', help='print all files, recommend >= 300 char wide terminal')
-    #parser.add_argument('--script', action='store_true', help='Print only if there are errors, usefule for running in loops in scripts')
+    parser.add_argument('--script', action='store_true', help='Print only if there are errors, usefule for running in loops in scripts')
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
     parser.add_argument('--date_range', action='store', help='Not used, but maintined for code compatability.')
