@@ -48,7 +48,7 @@ class CompactLogs:
         #if args.dbh is None:
         args.dbh = fmdb.FileMgmtDB({'des_services': args.des_services,
                                     'section': args.section})
-        args.dbh.dynam_load_ftmgmt()
+        args.dbh.dynam_load_ftmgmt('logtar')
 
         self.args = args
         self.win = win
