@@ -116,7 +116,7 @@ def main():
     (args, pfwids) = compare.determine_ids(args)
     manager = mp.Manager()
     event = manager.Event()
-    args.dbh = None
+
     def interrupt(x, y):
         event.set()
 
