@@ -231,7 +231,7 @@ class CompactLogs:
             # remove old files
             cannot_del = []
             self.status = 1
-            return 0
+
             self.dbh.commit()
             self.update("Removing original files")
             self.iteration = 0
