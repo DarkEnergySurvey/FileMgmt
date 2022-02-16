@@ -193,13 +193,12 @@ class CompactLogs:
             with tarfile.open(self.tarfile, 'w:gz') as zfh:
                 for fname, items in files_from_db.items():
                     fnames.append(os.path.join(self.archive_root, items['path'], fname))
-                    name = os.path.join(items['path'].replace(os.getcwd() + '/', ''), fname)
+                    name = fnames[-1].replace(os.getcwd() + '/', '')
                     zfh.add(name)
                     #fnames.append(fname)
                     self.iteration += 1
-                    self.results['null'].append({'fid', items['id']})
+                    self.results['null'].append({'fid': items['id']})
                     self.update()
-
 
             self.update("Updating database...")
             try:
@@ -218,10 +217,10 @@ class CompactLogs:
                              }
                     sql = "insert into desfile (filename, compression, filetype, pfw_attempt_id, wgb_task_id, filesize, md5sum) values (:fname, :comp, :ftype, :pfwid, :wgb, :fsize, :md5sum)"
                     curs.execute(sql, finfo)
-                    sql = f"select id from desfile where filename='{self.tarfile.replace('.gz', '')} and compression='.gz'"
+                    sql = f"select id from desfile where filename='{self.tarfile.replace('.gz', '')}' and compression='.gz'"
                     curs.execute(sql)
                     fid = curs.fetchone()[0]
-                    sql = f"insert into file_archive_info (filename, compression, archive_name, path, desfile_id) values ('{self.tarfile.replace('.gz', '')}', '.gz', '{self.archive}', '{os.path.join(relpath, 'log')}', {fid}"
+                    sql = f"insert into file_archive_info (filename, compression, archive_name, path, desfile_id) values ('{self.tarfile.replace('.gz', '')}', '.gz', '{self.archive}', '{os.path.join(relpath, 'log')}', {fid})"
                     curs.execute(sql)
 
             except:
@@ -233,7 +232,7 @@ class CompactLogs:
             cannot_del = []
             self.status = 1
             return 0
-            """ self.dbh.commit()
+            self.dbh.commit()
             self.update("Removing original files")
             self.iteration = 0
             self.update()
@@ -252,7 +251,7 @@ class CompactLogs:
                     for f in cannot_del:
                         fh.write(f"    {f}\n")
                 self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
-            """
+
         finally:
             os.chdir(owd)
         return 0
