@@ -243,7 +243,7 @@ class CompactLogs:
                     self.update()
                 except:
                     cannot_del.append(r)
-                    removeEmptyFolders(os.path.join(self.archive_root,relpath,'log'))
+            removeEmptyFolders(os.path.join(self.archive_root,relpath,'log'))
             self.status = 0
 
             if cannot_del:
