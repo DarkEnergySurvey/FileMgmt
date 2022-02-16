@@ -101,8 +101,11 @@ class CompactLogs:
                 self.que.put_nowait(Message(self.win, f"Processing {self.pfwid}  ({self.number+1}/{self.length})\n{msg}", pfwid=self.pfwid, err=err))
             else:
                 self.que.put_nowait(Message(self.win, None, self.pfwid, self.iteration, self.count))
-        elif msg is not None:
-            print(msg)
+        else:
+            if msg is not None:
+                print(msg)
+            else:
+                self.printProgressBar()
 
     def check_permissions(self, files_from_db):
         """ Check the permissions of the initial files to make sure they can be read and written
@@ -137,6 +140,16 @@ class CompactLogs:
             if self.event.is_set():
                 self.rollback()
         return self.halt
+
+    def printProgressBar(self, length = 100, fill = '█', printEnd = "\r"):
+        """ Print a progress bar
+        """
+        if self.silent:
+            return
+        percent = (f"{self.iteration:d}/{self.count:d}")
+        filledLength = int(length * self.iteration // self.count)
+        pbar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\rProgress: |{pbar}| {percent}', end = printEnd)
 
     def rollback(self):
         """ Method to undo any changes if something goes wrong
