@@ -5,9 +5,10 @@
 import os
 import tarfile
 
-import filemgmt.filemgmt_db as fmdb
+from despydmdb import desdmdbi
 import filemgmt.db_utils_local as dbutils
 import filemgmt.compare_utils as compare
+import filemgmt.disk_utils_local as dul
 
 def removeEmptyFolders(path, removeRoot=True):
     """ Function to remove empty folders
@@ -45,10 +46,8 @@ class CompactLogs:
     """
     def __init__(self, win, args, pfwids, event, que=None):
         self.pfwids = pfwids
-        #if args.dbh is None:
-        args.dbh = fmdb.FileMgmtDB({'des_services': args.des_services,
-                                    'section': args.section})
-        args.dbh.dynam_load_ftmgmt('logtar')
+        if args.dbh is None:
+            args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
 
         self.args = args
         self.win = win
@@ -208,7 +207,17 @@ class CompactLogs:
                     upsql = "delete from file_archive_info where desfile_id=:fid"
                     curs = self.dbh.cursor()
                     curs.executemany(upsql, self.results['null'])
-                    _ = self.dbh.register_file_data('logtar', [self.tarfile], self.pfwid, 0, False)
+                    #############_ = self.dbh.register_file_data('logtar', [self.tarfile], self.pfwid, 0, False)
+                    finfo = {'md5sum': dul.get_md5sum_file(self.tarfile),
+                             'fsize': os.path.getsize(self.tarfile),
+                             'pfwid': self.pfwid,
+                             'fname': self.tarfile.replace('.gz', ''),
+                             'comp': '.gz',
+                             'wgb': 0,
+                             'ftype': 'logtar'
+                             }
+                    sql = "insert into desfile (filename, compression, filetype, pfw_attempt_id, wgb_task_id, filesize, md5sum) values (:fname, :comp, :ftype, :pfwid, :wgb, :fsize, :md5sum)"
+                    curs.execute(sql, finfo)
                     sql = f"select id from desfile where filename='{self.tarfile.replace('.gz', '')} and compression='.gz'"
                     curs.execute(sql)
                     fid = curs.fetchone()[0]
