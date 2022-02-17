@@ -371,7 +371,7 @@ def determine_ids(args):
         if args.tag:
             pfwids = dbutils.get_pfw_attempt_id_from_tag(args.dbh, args.tag)
         # if dealing with a triplet
-        elif args.reqnum:
+        elif 'reqnum' in args and args.reqnum:
             pfwids = dbutils.get_pfw_attempt_ids_from_triplet(args.dbh, args)
             args.reqnum = None
             args.unitname = None
