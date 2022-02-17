@@ -42,8 +42,6 @@ class DelFiles(fmutils.FileManager):
         self.filetype = args.filetype
         self.dryrun = args.dryrun
         self.merged_comparison_info = {}
-        self.comparison_info = None
-
 
     def do_task(self):
         self.pfwids.sort() # put them in order

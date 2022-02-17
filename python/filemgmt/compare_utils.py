@@ -10,7 +10,6 @@ class FileCompare(fmutils.FileManager):
         self.end_at = args.end_at
         self.date_range = args.date_range
         self.pipeline = args.pipeline
-        self.comparison_info = None
 
     def print_all_files(self):
         """ Print both lists of files side by side
@@ -262,7 +261,7 @@ class FileCompare(fmutils.FileManager):
         self.get_files_from_disk()
         if self.debug:
             print("Compare")
-        self.comparison_info = self.compare_db_disk()
+        self.compare_db_disk()
         # print the full results unless requested not to
         if not self.script and not self.silent:
             print(f"\nPath = {self.archive_path}")

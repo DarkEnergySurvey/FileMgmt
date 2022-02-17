@@ -438,6 +438,7 @@ class FileManager:
         self.db_duplicates = None
         self.files_from_disk = None
         self.duplicates = None
+        self.comparison_info ={}
 
     def run(self):
         """ Execute the main task(s)
@@ -854,7 +855,7 @@ class FileManager:
         start_time = time.time()
         if self.debug:
             print("Comparing file information: BEG")
-        comparison_info = {'equal': [],
+        self.comparison_info = {'equal': [],
                            'dbonly': [],
                            'diskonly': [],
                            'both': [],
@@ -865,7 +866,7 @@ class FileManager:
                            'pfwid' : self.pfwid
                           }
         if self.md5sum:
-            comparison_info['md5sum'] = []
+            self.comparison_info['md5sum'] = []
 
         #if check_filesize:
         #    comparison_info['filesize'] = []
@@ -875,43 +876,42 @@ class FileManager:
         for fname in allfiles:
             if fname in self.files_from_db:
                 if fname in self.files_from_disk:
-                    comparison_info['both'].append(fname)
+                    self.comparison_info['both'].append(fname)
                     fdisk = self.files_from_disk[fname]
-                    fdb = files_from_db[fname]
-                    if fname in duplicates:
-                        comparison_info['duplicates'].append(fname)
+                    fdb = self.files_from_db[fname]
+                    if fname in self.duplicates:
+                        self.comparison_info['duplicates'].append(fname)
                     if fdisk['relpath'] == fdb['path']:
                         if fdisk['filesize'] == fdb['filesize']:
-                            if check_md5sum:
+                            if self.md5sum:
                                 if fdisk['md5sum'] == fdb['md5sum']:
-                                    comparison_info['equal'].append(fname)
+                                    self.comparison_info['equal'].append(fname)
                                 else:
-                                    comparison_info['md5sum'].append(fname)
+                                    self.comparison_info['md5sum'].append(fname)
                             else:
-                                comparison_info['equal'].append(fname)
+                                self.comparison_info['equal'].append(fname)
                         else:
-                            comparison_info['filesize'].append(fname)
+                            self.comparison_info['filesize'].append(fname)
                     else:
                         try:
-                            data = get_single_file_disk_info(fdb['path'] + '/' + fname, check_md5sum, archive_root)
-                            if fname not in duplicates:
-                                duplicates[fname] = []
-                            duplicates[fname].append(copy.deepcopy(files_from_disk[fname]))
-                            files_from_disk[fname] = data
-                            comparison_info['duplicates'].append(fname)
+                            data = dkutils.get_single_file_disk_info(fdb['path'] + '/' + fname, self.md5sum, self.archive_root)
+                            if fname not in self.duplicates:
+                                self.duplicates[fname] = []
+                            self.duplicates[fname].append(copy.deepcopy(self.files_from_disk[fname]))
+                            self.files_from_disk[fname] = data
+                            self.comparison_info['duplicates'].append(fname)
                         except:
-                            comparison_info['path'].append(fname)
+                            self.comparison_info['path'].append(fname)
                 else:
-                    comparison_info['dbonly'].append(fname)
+                    self.comparison_info['dbonly'].append(fname)
             else:
-                if fname in duplicates:
-                    comparison_info['pathdup'].append(fname)
-                comparison_info['diskonly'].append(fname)
+                if fname in self.duplicates:
+                    self.comparison_info['pathdup'].append(fname)
+                self.comparison_info['diskonly'].append(fname)
 
         end_time = time.time()
-        if debug:
+        if self.debug:
             print(f"Comparing file information: END ({end_time - start_time} secs)")
-        return comparison_info
 
     def do_task(self):
         """ Do the main task, must be overloaded by child class

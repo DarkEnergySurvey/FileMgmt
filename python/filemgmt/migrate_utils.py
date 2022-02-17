@@ -182,23 +182,23 @@ class Migration(fmutils.FileManager):
         self.get_files_from_db()
         self.get_files_from_disk()
 
-        comparison_info = self.compare_db_disk()
+        self.compare_db_disk()
         error = False
-        if len(comparison_info['dbonly']) > 0:
+        if len(self.comparison_info['dbonly']) > 0:
             error = True
-            self.update(f"Error {len(comparison_info['dbonly']):d} files found only in the DB", True)
-        if len(comparison_info['diskonly']) > 0:
+            self.update(f"Error {len(self.comparison_info['dbonly']):d} files found only in the DB", True)
+        if len(self.comparison_info['diskonly']) > 0:
             error = True
-            self.update(f"Error {len(comparison_info['diskonly']):d} files only found on disk", True)
-        if len(comparison_info['path']) > 0:
+            self.update(f"Error {len(self.comparison_info['diskonly']):d} files only found on disk", True)
+        if len(self.comparison_info['path']) > 0:
             error = True
-            self.update(f"Error {len(comparison_info['path']):d} files have mismatched paths", True)
-        if len(comparison_info['filesize']) > 0:
+            self.update(f"Error {len(self.comparison_info['path']):d} files have mismatched paths", True)
+        if len(self.comparison_info['filesize']) > 0:
             error = True
-            self.update(f"Error {len(comparison_info['filesize']):d} files have mismatched file sizes", True)
-        if len(comparison_info['md5sum']) > 0:
+            self.update(f"Error {len(self.comparison_info['filesize']):d} files have mismatched file sizes", True)
+        if len(self.comparison_info['md5sum']) > 0:
             error = True
-            self.update(f"Error {len(comparison_info['md5sum']):d} files have mismatched md5sums", True)
+            self.update(f"Error {len(self.comparison_info['md5sum']):d} files have mismatched md5sums", True)
         if error:
             self.rollback()
             return 1
