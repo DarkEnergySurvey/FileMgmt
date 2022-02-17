@@ -333,13 +333,13 @@ def determine_ids(args):
     if 'relpath' in args and args.relpath and (args.reqnum or args.unitname or args.attnum or args.tag or args.pfwid):
         print("Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified.")
         sys.exit(1)
-    if args.reqnum and (args.tag or args.pfwid):
+    if 'reqnum' in args and args.reqnum and (args.tag or args.pfwid):
         print("Reqnum was specified, thus tag and pfwid cannot be specified.")
         sys.exit(1)
     if args.tag and args.pfwid:
         print("Tag was specified, thus pfwid cannot be specified.")
         sys.exit(1)
-    if (args.unitname or args.attnum) and not args.reqnum:
+    if (('unitname' in args and args.unitname) or ('attnum' in args and args.attnum)) and not args.reqnum:
         print("Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again.")
         sys.exit(1)
 
@@ -353,7 +353,7 @@ def determine_ids(args):
             whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[1]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
         if args.pipeline:
             whereclause.append(f"subpipeprod='{args.pipeline}'")
-        if args.reqnum:
+        if 'reqnum' in args and args.reqnum:
             whereclause.append(f"reqnum={args.reqnum}")
             if args.unitname:
                 whereclause.append(f"unitname='{args.unitname}'")
