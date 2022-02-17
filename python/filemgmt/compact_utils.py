@@ -60,6 +60,9 @@ class CompactLogs(fmutils.FileManager):
             logroot = os.path.join(self.archive_root, self.relpath, 'log')
             self.get_files_from_db('log')
             self.count = len(self.files_from_db)
+            if self.count == 0:
+                self.update("No log files found.")
+                return 0
             os.chdir(logroot)
             if not self.check_permissions(self.files_from_db):
                 return 0
