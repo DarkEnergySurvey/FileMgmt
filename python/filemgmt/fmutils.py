@@ -310,8 +310,8 @@ def run(inputs):
     """
     try:
         (action, wn, args, pfwids, event, que) = inputs
-        action(wn, args, pfwids, event, que)
-        return action.run()
+        runner = action(wn, args, pfwids, event, que)
+        return runner.run()
     finally:
         que.put_nowait(Message(wn, COMPLETE, 0))
 
