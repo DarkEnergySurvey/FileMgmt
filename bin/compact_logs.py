@@ -83,7 +83,8 @@ def main():
     signal.signal(signal.SIGINT, interrupt)
 
     if args.parallel <= 1:
-        _ = cu.CompactLogs(0, args, pfwids, event)
+        cul = cu.CompactLogs(0, args, pfwids, event)
+        cul.run()
     else:
         if args.parallel > 8:
             args.parallel = 8

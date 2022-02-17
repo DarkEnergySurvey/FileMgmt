@@ -93,7 +93,8 @@ def main():
     signal.signal(signal.SIGINT, interrupt)
 
     if args.parallel <= 1:
-        _ = mu.Migration(0, args, pfwids, event)
+        mul = mu.Migration(0, args, pfwids, event)
+        mul.run()
     else:
         if args.parallel > 8:
             args.parallel = 8
