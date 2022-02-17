@@ -67,9 +67,6 @@ def main():
     """
     start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
-    if args.reqnum or args.attnum or args.unitname:
-        print("Cannot specify reqnum, attnum, or unitname")
-        return
     if args.log is not None:
         stdp = fmutils.Print(args.log)
         sys.stdout = stdp
