@@ -6,9 +6,18 @@
 """ Miscellaneous FileMgmt utils """
 
 import json
-import despymisc.miscutils as miscutils
-import despymisc.misctime as misctime
+import os
+import sys
+import time
+import copy
 
+from despydmdb import desdmdbi
+from despymisc import miscutils
+from despymisc import misctime
+import filemgmt.db_utils_local as dbutils
+import filemgmt.disk_utils_local as dkutils
+
+COMPLETE = "Complete"
 
 ##################################################################################################
 def get_config_vals(archive_info, config, keylist):
@@ -165,6 +174,23 @@ def read_json_single(json_file, allMandatoryExposureKeys):
 
 ##################################################################################################
 
+def build_where_clause(wherevals):
+    """ Method to create a where clause from a list of statements
+
+        Parameters
+        ----------
+        wherevals : list
+            List of statements to add to a where clause (e.g. "DATA_STATE='JUNK'")
+
+    """
+    sql = ""
+    for num, val in enumerate(wherevals):
+        if num > 0:
+            sql += ' and'
+        sql += ' ' + val
+    return sql
+
+
 class DataObject:
     """ Class to turn a dictionary into class elements
 
@@ -203,3 +229,696 @@ class DataObject:
         if not hasattr(self, attrib):
             raise Exception(f"{attrib} is not a member of DataObject.")
         setattr(self, attrib, value)
+
+class Print:
+    """ Class to capture printed output and write it to a log file
+
+        Parameters
+        ----------
+        logfile : str
+            The log file to write to
+
+    """
+    def __init__(self, logfile):
+        self.old_stdout = sys.stdout
+        self.logfile = open(logfile, 'w')
+
+    def write(self, text):
+        """ Method to capture, reformat, and write out the requested text
+
+            Parameters
+            ----------
+            test : str
+                The text to reformat
+
+        """
+        self.logfile.write(text)
+
+    def close(self):
+        """ Method to return stdout to its original handle
+
+        """
+        return self.old_stdout
+
+    def flush(self):
+        """ Method to force the buffer to flush
+
+        """
+        self.old_stdout.flush()
+
+def removeEmptyFolders(path, removeRoot=True):
+    """ Function to remove empty folders
+    """
+    if not os.path.isdir(path):
+        return
+
+    # remove empty subfolders
+    files = os.listdir(path)
+    if len(files):
+        for f in files:
+            fullpath = os.path.join(path, f)
+            if os.path.isdir(fullpath):
+                removeEmptyFolders(fullpath)
+
+    # if folder empty, delete it
+    files = os.listdir(path)
+    if len(files) == 0 and removeRoot:
+        os.rmdir(path)
+
+class Message:
+    """ Class for passing messages to main process
+    """
+    def __init__(self, window, msg, pfwid, iteration=None, count=None, err=False):
+        self.win = window
+        self.msg = msg
+        self.iteration = iteration
+        self.count = count
+        self.err = err
+        self.pfwid = pfwid
+
+
+def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd = "\n"):
+    """ Print a progress bar
+    """
+    percent = (f"{iteration:d}/{count:d}")
+    filledLength = int(length * iteration // count)
+    pbar = fill * filledLength + '-' * (length - filledLength)
+    win.addstr(2, 0, f"Progress: |{pbar}| {percent}{printEnd}")
+
+def run(inputs):
+    """ Method to launch a multiprocessing run
+    """
+    try:
+        (action, wn, args, pfwids, event, que) = inputs
+        action(wn, args, pfwids, event, que)
+        return action.run()
+    finally:
+        que.put_nowait(Message(wn, COMPLETE, 0))
+
+def results_error(err):
+    """ Error handling routine
+    """
+    print("Exception raised:")
+    print(err)
+    raise err
+
+def determine_ids(args):
+    """ Find the pfw_attempt_id(s) based on tag or triplet
+    """
+    if args.dbh is None:
+        args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
+    # do some quick validation
+    if 'date_range' in args and args.date_range and args.pfwid:
+        print("Date_range was specified, thus pfwid cannot be.")
+    if 'relpath' in args and args.relpath and (args.reqnum or args.unitname or args.attnum or args.tag or args.pfwid):
+        print("Relpath was specified, thus reqnum, unitname, attnum, tag, and pfwid cannot be specified.")
+        sys.exit(1)
+    if args.reqnum and (args.tag or args.pfwid):
+        print("Reqnum was specified, thus tag and pfwid cannot be specified.")
+        sys.exit(1)
+    if args.tag and args.pfwid:
+        print("Tag was specified, thus pfwid cannot be specified.")
+        sys.exit(1)
+    if (args.unitname or args.attnum) and not args.reqnum:
+        print("Unitname and/or attnum were specified, but reqnum was not, please supply a reqnum and run again.")
+        sys.exit(1)
+
+    # if dealing with a date range then get the relevant pfw_attempt_ids
+    if 'date_range' in args and args.date_range:
+        dates = args.date_range.split(',')
+        whereclause = []
+        if len(dates) == 1:
+            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[0]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
+        else:
+            whereclause.append(f"submittime>=TO_DATE('{dates[0]} 00:00:01', 'YYYY-MM-DD HH24:MI:SS') and submittime<=TO_DATE('{dates[1]} 23:59:59', 'YYYY-MM-DD HH24:MI:SS')")
+        if args.pipeline:
+            whereclause.append(f"subpipeprod='{args.pipeline}'")
+        if args.reqnum:
+            whereclause.append(f"reqnum={args.reqnum}")
+            if args.unitname:
+                whereclause.append(f"unitname='{args.unitname}'")
+            if args.attnum:
+                whereclause.append(f"attnum={args.attnum}")
+        elif args.tag:
+            whereclause.append(f"id in (select pfw_attempt_id from proctag where tag='{args.tag}')")
+        pfwids = dbutils.get_pfw_attempt_ids_where(args.dbh, whereclause, 'id')
+
+        if not args.silent:
+            print(f"Found {len(pfwids):d} pfw_attempt_id's for the given date range (and any qualifying tag/reqnum)")
+    else:
+        pfwids = []
+        # if dealing with a tag then get the relevant pfw_attempt_ids
+        if args.tag:
+            pfwids = dbutils.get_pfw_attempt_id_from_tag(args.dbh, args.tag)
+        # if dealing with a triplet
+        elif args.reqnum:
+            pfwids = dbutils.get_pfw_attempt_ids_from_triplet(args.dbh, args)
+            args.reqnum = None
+            args.unitname = None
+            args.attnum = None
+        elif args.pfwid and ',' in args.pfwid:
+            pfwids = args.pfwid.split(',')
+
+    return args, pfwids
+
+class FileManager:
+    """ Base class for multiple file management activities
+
+    """
+    def __init__(self, win, args, pfwids, event, que=None):
+        self.pfwids = pfwids
+        if args.dbh is None:
+            self.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
+        else:
+            self.dbh = args.dbh
+        self.win = win
+        self.event = event
+        self.que = que
+        self.des_services = args.des_services
+        self.section = args.section
+        self.archive = args.archive
+        self.operator = None
+        self.state = None
+        self.archive_path = None
+        if 'relpath' in args:
+            self.relpath = args.relpath
+        else:
+            self.relpath = None
+        if 'reqnum' in args:
+            self.reqnum = args.reqnum
+        else:
+            self.reqnum = None
+        if 'unitname' in args:
+            self.unitname = args.unitname
+        else:
+            self.unitname = None
+        if 'attnum' in args:
+            self.attnum = args.attnum
+        else:
+            self.attnum = None
+        if 'md5sum' in args:
+            self.md5sum = args.md5sum
+        else:
+            self.md5sum = False
+        self.verbose = args.verbose
+        self.debug = args.debug
+        self.script = args.script
+        self.pfwid = args.pfwid
+        self.silent = args.silent
+        self.tag = args.tag
+        self.archive_root = None
+        self.count = 0
+        self.currnewpath = None
+        self.status = 0
+        self.iteration = 0
+        self.halt = False
+        self.number = 0
+        self.length = 1
+        self.files_from_db = None
+        self.db_duplicates = None
+        self.files_from_disk = None
+        self.duplicates = None
+
+    def run(self):
+        """ Execute the main task(s)
+
+        """
+        if not self.pfwids:
+            return self.do_task()
+        if len(self.pfwids) == 1:
+            self.pfwid = self.pfwids[0]
+            return self.do_task()
+        self.pfwids.sort() # put them in order
+        return self.multi_task()
+
+    def __del__(self):
+        if self.dbh:
+            self.dbh.close()
+
+    def update(self, msg=None, err=False):
+        """ Method to report the progress of the job
+
+        """
+        if self.silent:
+            return
+        if self.que is not None:
+            if msg is not None:
+                self.que.put_nowait(Message(self.win, f"Processing {self.pfwid}  ({self.number+1}/{self.length})\n{msg}", pfwid=self.pfwid, err=err))
+            else:
+                self.que.put_nowait(Message(self.win, None, self.pfwid, self.iteration, self.count))
+        else:
+            if msg is not None:
+                print(msg)
+            else:
+                self.printProgressBar()
+
+    def gather_data(self):
+        """ Make sure command line arguments have valid values
+
+            Parameters
+            ----------
+            dbh : database connection
+                connection to use for checking the database related argumetns
+
+            args : dict
+                dictionary containing the command line arguemtns
+
+            Returns
+            -------
+            string containing the archive root
+
+        """
+        if 'relpath' in self.__dict__ and self.relpath is not None:
+            self.get_paths_by_path()
+        elif ('reqnum' in self.__dict__ and self.reqnum) or self.pfwid:
+            self.get_paths_by_id()
+        else:
+            raise Exception("Either relpath, pfwid, or a reqnum must be specified.")
+        if not self.relpath:
+            return
+        # check path exists on disk
+        if not os.path.exists(self.archive_path):
+            print(f"Warning: Path does not exist on disk:  {self.archive_path}")
+        if self.verbose:
+            self.silent = False
+
+    def check_status(self):
+        """ Method to check whether the processing should continue
+        """
+        if self.halt:
+            return True
+        if self.event is not None:
+            if self.event.is_set():
+                self.rollback(self.currnewpath)
+        return self.halt
+
+    def printProgressBar(self, length = 100, fill = '█', printEnd = "\r"):
+        """ Print a progress bar
+        """
+        if self.silent:
+            return
+        percent = (f"{self.iteration:d}/{self.count:d}")
+        filledLength = int(length * self.iteration // self.count)
+        pbar = fill * filledLength + '-' * (length - filledLength)
+        print(f'\rProgress: |{pbar}| {percent}', end = printEnd)
+
+    def check_permissions(self, files_from_db):
+        """ Check the permissions of the initial files to make sure they can be read and written
+        """
+        bad_files = []
+        self.update("Checking file permissions")
+        self.iteration = 0
+        self.update()
+        for fname, items in files_from_db.items():
+            if self.check_status():
+                return False
+            if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
+                bad_files.append(fname)
+            self.iteration += 1
+            self.update()
+
+        if bad_files:
+            with open(f"{self.pfwid}.badperm", 'w', encoding="utf-8") as fh:
+                for f in bad_files:
+                    fh.write(f"{f}\n")
+
+            self.update(f"Some files do not have rw permissions. See {self.pfwid}.badperm for a list.", True)
+            return False
+        return True
+
+    def multi_task(self):
+        """ Method to iterate over pfw_attempt_id's and run the migration script
+
+            Parameters
+            ----------
+            dbh : database handle
+            pfwids : result of querying a table for pfw_attempt_ids, usually a list of single element tuples
+            args : an instance of Args containing the command line arguments
+
+            Returns
+            -------
+            A summary of the results of do_migration
+        """
+        self.length = len(self.pfwids)
+        retval = 0
+        for i, pdwi in enumerate(self.pfwids):
+            self.number = i
+            if self.check_status():
+                return 0
+            self.count = 0
+
+            self.pfwid = pdwi
+            retval += self.do_task()
+        return retval
+
+    def get_paths_by_path(self):
+        """ Method to get data about files based on path
+        """
+        # check archive is valid archive name (and get archive root)
+        sql = f"select root from ops_archive where name={self.dbh.get_named_bind_string('name')}"
+
+        curs = self.dbh.cursor()
+        curs.execute(sql, {'name': self.archive})
+        rows = curs.fetchall()
+        cnt = len(rows)
+        if cnt != 1:
+            print(f"Invalid archive name ({self.archive}).   Found {cnt} rows in ops_archive")
+            print("\tAborting")
+            sys.exit(1)
+
+        self.archive_root = rows[0][0]
+        # see if relpath is the root directory for an attempt
+        sql = f"select operator, id from pfw_attempt where archive_path={self.dbh.get_named_bind_string('apath')}"
+        curs.execute(sql, {'apath' : self.relpath,})
+        rows = curs.fetchall()
+        if not rows:
+            print(f"\nCould not find an attempt with an archive_path={self.relpath}")
+            print("Assuming that this is part of an attempt, continuing...\n")
+            self.operator = None
+            self.state = ""
+            self.pfwid = None
+        elif len(rows) > 1:
+            print("More than one pfw_attempt_id is assocaited with this path, use tag, or specify by pfw_attempt_id rather than a path")
+            print('\nAborting')
+            sys.exit(1)
+        else:
+            self.operator = rows[0][0]
+            self.pfwid = rows[0][1]
+
+            sql = f"select data_state from attempt_state where pfw_attempt_id={self.dbh.get_named_bind_string('pfwid')}"
+            curs.execute(sql, {'pfwid': self.pfwid})
+            rows = curs.fetchall()
+            self.state = rows[0][0]
+
+        self.archive_path = os.path.join(self.archive_root, self.relpath)
+
+    def get_paths_by_id(self):
+        """ Make sure command line arguments have valid values
+
+            Parameters
+            ----------
+            dbh : database connection
+                connection to use for checking the database related argumetns
+
+            args : dict
+                dictionary containing the command line arguemtns
+
+            Returns
+            -------
+            string containing the archive root
+
+        """
+
+        # check archive is valid archive name (and get archive root)
+        sql = f"select root from ops_archive where name={self.dbh.get_named_bind_string('name')}"
+
+        curs = self.dbh.cursor()
+        curs.execute(sql, {'name': self.archive})
+        rows = curs.fetchall()
+        cnt = len(rows)
+        if cnt != 1:
+            print(f"Invalid archive name ({self.archive}).   Found {cnt} rows in ops_archive")
+            print("\tAborting")
+            sys.exit(1)
+
+        self.archive_root = rows[0][0]
+
+        if self.pfwid:
+            sql = f"select pfw.archive_path, ats.data_state, pfw.operator, pfw.reqnum, pfw.unitname, pfw.attnum from pfw_attempt pfw, attempt_state ats where pfw.id={self.dbh.get_named_bind_string('pfwid')} and ats.pfw_attempt_id=pfw.id"
+            curs.execute(sql, {'pfwid' : self.pfwid})
+            rows = curs.fetchall()
+
+            self.relpath = rows[0][0]
+            self.state = rows[0][1]
+            self.operator = rows[0][2]
+            self.reqnum = rows[0][3]
+            self.unitname = rows[0][4]
+            self.attnum = rows[0][5]
+
+        else:
+        ### sanity check relpath
+            sql = f"select archive_path, operator, id from pfw_attempt where reqnum={self.dbh.get_named_bind_string('reqnum')} and unitname={self.dbh.get_named_bind_string('unitname')} and attnum={self.dbh.get_named_bind_string('attnum')}"
+            curs.execute(sql, {'reqnum' : self.reqnum,
+                               'unitname' : self.unitname,
+                               'attnum' : self.attnum})
+            rows = curs.fetchall()
+
+            self.relpath = rows[0][0]
+            self.operator = rows[0][1]
+            self.pfwid = rows[0][2]
+            sql = f"select data_state from attempt_state where pfw_attempt_id={self.dbh.get_named_bind_string('pfwid')}"
+            curs.execute(sql, {'pfwid' : self.pfwid})
+            rows = curs.fetchall()
+
+            self.state = rows[0][0]
+
+        if self.relpath is None:
+            raise Exception(f" Path is NULL in database for pfw_attempt_id {self.pfwid}.")
+        self.archive_path = os.path.join(self.archive_root, self.relpath)
+
+    def get_files_from_db(self, filetype=None):
+        """ Query DB to get list of files within that path inside the archive
+
+            Parameters
+            ----------
+            dbh : database connection
+                The database connection to use
+
+            relpath : str
+                The relative path of the directory to gather info for
+
+            archive : str
+                The archive name to use
+
+            debug : bool
+                Whether or not to report debugging information
+
+            Returns
+            -------
+            Dictionary containing the file info from the archive (path, name, filesize, md5sum)
+        """
+
+        if self.debug:
+            start_time = time.time()
+            print("Getting file information from db: BEG")
+        sql = "select fai.path, art.filename, art.compression, art.id, art.md5sum, art.filesize from desfile art, file_archive_info fai where"
+        if filetype is not None:
+            sql += build_where_clause([f'art.pfw_attempt_id={str(self.pfwid)}',
+                                       'fai.desfile_id=art.id',
+                                       'art.filetype=\'' + filetype + '\'',
+                                       'fai.archive_name=\'' + self.archive + '\''])
+        elif self.pfwid is not None:
+            sql += build_where_clause([f'art.pfw_attempt_id={str(self.pfwid)}',
+                                       'fai.desfile_id=art.id',
+                                       'fai.archive_name=\'' + self.archive + '\''])
+        elif self.relpath is not None:
+            sql += build_where_clause(['fai.desfile_id=art.id',
+                                       'fai.archive_name=\'' + self.archive + '\'',
+                                       'fai.path like \'' + self.relpath + '%\''])
+
+        if self.debug:
+            print(f"\nsql = {sql}\n")
+
+        curs = self.dbh.cursor()
+        curs.execute(sql)
+        if self.debug:
+            print("executed")
+        desc = [d[0].lower() for d in curs.description]
+
+        filelist = []
+
+        self.files_from_db = {}
+        for row in curs:
+            fdict = dict(zip(desc, row))
+            fname = fdict['filename']
+            if fdict['compression'] is not None:
+                fname += fdict['compression']
+            filelist.append(fname)
+            self.files_from_db[fname] = fdict
+            if "path" in fdict:
+                if fdict["path"][-1] == '/':
+                    fdict['path'] = fdict['path'][:-1]
+            #    m = re.search("/p(\d\d)",fdict["path"])
+            #    if m:
+            #        fdict["path"] = fdict["path"][:m.end()]
+        self.check_db_duplicates(filelist)
+        if self.debug:
+            end_time = time.time()
+            print(f"Getting file information from db: END ({end_time - start_time} secs)")
+
+    def check_db_duplicates(self, filelist):  #including compression
+        """ Method to check for duplicates in DB
+        """
+        table = self.dbh.load_filename_gtt(filelist)
+        sql = f"select fai.path, art.filename, art.compression,art.id, art.md5sum, art.filesize from desfile art, file_archive_info fai, {table} gtt where fai.desfile_id=art.id and fai.archive_name='{self.archive}' and gtt.filename=art.filename and coalesce(fai.compression,'x') = coalesce(gtt.compression,'x')"
+
+        curs = self.dbh.cursor()
+        curs.execute(sql)
+        results = curs.fetchall()
+        self.db_duplicates = {}
+
+        if len(results) == len(filelist):
+            return
+        templist = []
+        desc = [d[0].lower() for d in curs.description]
+
+        for row in results:
+            fdict = dict(zip(desc, row))
+            fname = fdict['filename']
+            if fdict['compression'] is not None:
+                fname += fdict['compression']
+
+            if fname not in templist:
+                templist.append(fname)
+            else:
+                if fname not in self.db_duplicates:
+                    self.db_duplicates[fname] = []
+                self.db_duplicates[fname].append(fdict)
+            if "path" in fdict:
+                if fdict["path"].endswith('/'):
+                    fdict['path'] = fdict['path'][:-1]
+
+    def get_files_from_disk(self):
+        """ Check disk to get list of files within that path inside the archive
+
+            Parameters
+            ----------
+            archive_root : str
+                The base root of the relpath entry
+
+            check_md5sum : bool
+                Whether or not to compare md5sums
+
+            debug : bool
+                Whether or not to report debugging info
+
+            Returns
+            -------
+            A dictionary contianing the info about the files on disk (filesize, md5sum, compression, filename, path)
+
+        """
+
+        start_time = time.time()
+        if self.debug:
+            print("Getting file information from disk: BEG")
+
+        self.files_from_disk = {}
+        self.duplicates = {}
+        for (dirpath, _, filenames) in os.walk(os.path.join(self.archive_root, self.relpath)):
+            for filename in filenames:
+                fullname = f'{dirpath}/{filename}'
+                data = dkutils.get_single_file_disk_info(fullname, self.md5sum, self.archive_root)
+                if filename in self.files_from_disk:
+                    if filename not in self.duplicates:
+                        self.duplicates[filename] = [copy.deepcopy(self.files_from_disk[filename])]
+                    self.duplicates[filename].append(data)
+                    #print "DUP",filename,files_from_disk[filename]['path'],data['path']
+                else:
+                    self.files_from_disk[filename] = data
+
+        end_time = time.time()
+        if self.debug:
+            print(f"Getting file information from disk: END ({end_time - start_time} secs)")
+
+
+    def compare_db_disk(self):
+        """ Compare file info from DB to info from disk
+
+            Parameters
+            ----------
+            file_from_db : dict
+                Dicitonary containing the file info from the database
+
+            files_from_disk : dict
+                Dictionary containing the file info from disk
+
+            check_md5sum : bool
+                Whether or not to report the md5sum comparision
+
+            check_filesize : bool
+                Whether or not to report the filesize comparison
+
+            debug : bool
+                Whenther or not to report debugging info
+                Default: False
+
+            archive_root : str
+                The archive root path
+                Default : False
+
+            Returns
+            -------
+            None
+        """
+
+        start_time = time.time()
+        if self.debug:
+            print("Comparing file information: BEG")
+        comparison_info = {'equal': [],
+                           'dbonly': [],
+                           'diskonly': [],
+                           'both': [],
+                           'path': [],
+                           'filesize': [],
+                           'duplicates': [], # has db entry
+                           'pathdup' : [],    # has no db entry
+                           'pfwid' : self.pfwid
+                          }
+        if self.md5sum:
+            comparison_info['md5sum'] = []
+
+        #if check_filesize:
+        #    comparison_info['filesize'] = []
+
+        allfiles = set(self.files_from_db).union(set(self.files_from_disk))
+
+        for fname in allfiles:
+            if fname in self.files_from_db:
+                if fname in self.files_from_disk:
+                    comparison_info['both'].append(fname)
+                    fdisk = self.files_from_disk[fname]
+                    fdb = files_from_db[fname]
+                    if fname in duplicates:
+                        comparison_info['duplicates'].append(fname)
+                    if fdisk['relpath'] == fdb['path']:
+                        if fdisk['filesize'] == fdb['filesize']:
+                            if check_md5sum:
+                                if fdisk['md5sum'] == fdb['md5sum']:
+                                    comparison_info['equal'].append(fname)
+                                else:
+                                    comparison_info['md5sum'].append(fname)
+                            else:
+                                comparison_info['equal'].append(fname)
+                        else:
+                            comparison_info['filesize'].append(fname)
+                    else:
+                        try:
+                            data = get_single_file_disk_info(fdb['path'] + '/' + fname, check_md5sum, archive_root)
+                            if fname not in duplicates:
+                                duplicates[fname] = []
+                            duplicates[fname].append(copy.deepcopy(files_from_disk[fname]))
+                            files_from_disk[fname] = data
+                            comparison_info['duplicates'].append(fname)
+                        except:
+                            comparison_info['path'].append(fname)
+                else:
+                    comparison_info['dbonly'].append(fname)
+            else:
+                if fname in duplicates:
+                    comparison_info['pathdup'].append(fname)
+                comparison_info['diskonly'].append(fname)
+
+        end_time = time.time()
+        if debug:
+            print(f"Comparing file information: END ({end_time - start_time} secs)")
+        return comparison_info
+
+    def do_task(self):
+        """ Do the main task, must be overloaded by child class
+        """
+        raise Exception("FimeManager.do_task cannot be directly called. It must be implemented by a child class.")
+
+    def rollback(self, x=None):
+        """ Return the data to its original state.
+        """
+        return

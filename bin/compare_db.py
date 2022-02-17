@@ -79,7 +79,9 @@ def main():
     if args.log is not None:
         stdp = compare.Print(args.log)
         sys.stdout = stdp
-    ret = compare.run_compare(args)
+    (args, pfwids) = fmutils.determine_ids(args)
+    comp = compare.FileCompare(args, pfwids)
+    ret = compare.run()
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()

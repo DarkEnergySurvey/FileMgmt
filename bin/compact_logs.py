@@ -11,10 +11,9 @@ import time
 import multiprocessing as mp
 import datetime
 
-import filemgmt.compare_utils as compare
+from filemgmt import fmutils
 from filemgmt import compact_utils as cu
 
-COMPLETE = "Complete"
 
 def parse_cmd_line(argv):
     """ Parse command line arguments
@@ -46,20 +45,13 @@ The following are all valid ways to select the files:
                                      epilog=epilog)
     parser.add_argument('--des_services', action='store', help='Services file.')
     parser.add_argument('--section', '-s', action='store', help='Must be specified if DES_DB_SECTION is not set in environment')
-    parser.add_argument('--archive', action='store', default='desar2home', help='archive_name from file_archive_info table for the files to be moved')
-    parser.add_argument('--reqnum', action='store', help='Not used, but maintined for code compatability.')
-    parser.add_argument('--relpath', action='store', help='Not used, but maintined for code compatability.')
-    parser.add_argument('--unitname', action='store', help='Not used, but maintined for code compatability.')
-    parser.add_argument('--attnum', action='store', help='Not used, but maintined for code compatability.')
+    parser.add_argument('--archive', action='store', default='desar2home', help='Archive_name from file_archive_info table. Only use if compressing logs in the archive.')
     parser.add_argument('--verbose', action='store_true', help='print differences between db and disk')
     parser.add_argument('--debug', action='store_true', help='print all files, recommend >= 300 char wide terminal')
     parser.add_argument('--script', action='store_true', help='Print only if there are errors, usefule for running in loops in scripts')
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
-    parser.add_argument('--date_range', action='store', help='Not used, but maintined for code compatability.')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
-    parser.add_argument('--start_at', action='store', help='Not used, but maintined for code compatability.', type=int, default=1)
-    parser.add_argument('--end_at', action='store', help='Not used, but maintined for code compatability.', type=int, default=0)
     parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the work, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
@@ -68,29 +60,6 @@ The following are all valid ways to select the files:
         cargs.verbose = False
     return cargs
 
-def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd = "\n"):
-    """ Print a progress bar
-    """
-    percent = (f"{iteration:d}/{count:d}")
-    filledLength = int(length * iteration // count)
-    pbar = fill * filledLength + '-' * (length - filledLength)
-    win.addstr(2, 0, f"Progress: |{pbar}| {percent}{printEnd}")
-
-def run(inputs):
-    """ Method to launch a multiprocessing run
-    """
-    try:
-        (wn, args, pfwids, event, que) = inputs
-        cu.CompactLogs(wn, args, pfwids, event, que)
-    finally:
-        que.put_nowait(cu.Message(wn, COMPLETE, 0))
-
-def results_error(err):
-    """ Error handling routine
-    """
-    print("Exception raised:")
-    print(err)
-    raise err
 
 def main():
     """ Main program module
@@ -98,22 +67,13 @@ def main():
     """
     start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
-    if args.date_range:
-        print("Date ranges cannot be used with the migration script")
-        return
-    if args.start_at != 1 or args.end_at != 0:
-        print("start_at and end_at cannot be used with the migration script")
-        return
-    if args.relpath:
-        print("relpath cannot be used with migration script")
-        return
     if args.reqnum or args.attnum or args.unitname:
         print("Cannot specify reqnum, attnum, or unitname")
         return
     if args.log is not None:
-        stdp = compare.Print(args.log)
+        stdp = fmutils.Print(args.log)
         sys.stdout = stdp
-    (args, pfwids) = compare.determine_ids(args)
+    (args, pfwids) = fmutils.determine_ids(args)
     manager = mp.Manager()
     event = manager.Event()
 
@@ -153,7 +113,7 @@ def main():
                 wins.append(curses.newwin(step, num_cols, i*step, 0))
 
             with mp.Pool(processes=len(jobs), maxtasksperchild=1) as pool:
-                _ = [pool.apply_async(run, args=((i, copy.deepcopy(args), jobs[i], event, queu,),), error_callback=results_error) for i in range(len(jobs))]
+                _ = [pool.apply_async(fmutils.run, args=((cu.CompactLogs, i, copy.deepcopy(args), jobs[i], event, queu,),), error_callback=fmutils.results_error) for i in range(len(jobs))]
                 pool.close()
                 #pool.join()
                 while not all(done):
@@ -165,7 +125,7 @@ def main():
                                     errors[ms.pfwid] = []
                                 errors[ms.pfwid].append(ms.msg)
                                 continue
-                            if ms.msg == COMPLETE:
+                            if ms.msg == fmutils.COMPLETE:
                                 done[ms.win] = True
                                 wins[ms.win].clear()
                                 wins[ms.win].addstr("Complete\n")
@@ -173,7 +133,7 @@ def main():
                                 wins[ms.win].clear()
                                 wins[ms.win].addstr(ms.msg + '\n')
                             else:
-                                printProgressBar(wins[ms.win], ms.iteration, ms.count)
+                                fmutils.printProgressBar(wins[ms.win], ms.iteration, ms.count)
                             wins[ms.win].refresh()
                         except queue.Empty:
                             break

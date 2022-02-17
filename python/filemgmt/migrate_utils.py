@@ -9,134 +9,20 @@ from pathlib import Path
 import time
 
 from despymisc import miscutils
-from despydmdb import desdmdbi
-import filemgmt.disk_utils_local as diskutils
-import filemgmt.db_utils_local as dbutils
-import filemgmt.compare_utils as compare
+from filemgmt import fmutils
 
-def removeEmptyFolders(path, removeRoot=True):
-    """ Function to remove empty folders
-    """
-    if not os.path.isdir(path):
-        return
 
-    # remove empty subfolders
-    files = os.listdir(path)
-    if len(files):
-        for f in files:
-            fullpath = os.path.join(path, f)
-            if os.path.isdir(fullpath):
-                removeEmptyFolders(fullpath)
-
-    # if folder empty, delete it
-    files = os.listdir(path)
-    if len(files) == 0 and removeRoot:
-        os.rmdir(path)
-
-class Message:
-    """ Class for passing messages to main process
-    """
-    def __init__(self, window, msg, pfwid, iteration=None, count=None, err=False):
-        self.win = window
-        self.msg = msg
-        self.iteration = iteration
-        self.count = count
-        self.err = err
-        self.pfwid = pfwid
-
-class Migration:
-    """ Class for migrating data
-
-    """
+class Migration(fmutils.FileManager):
     def __init__(self, win, args, pfwids, event, que=None):
-        self.pfwids = pfwids
-        if args.dbh is None:
-            args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
-        self.args = args
-        self.win = win
-        self.event = event
-        self.que = que
-        self.dbh = self.args.dbh
-        self.des_services = self.args.des_services
-        self.section = self.args.section
-        self.archive = self.args.archive
-        self.destination = self.args.destination
-        self.current = self.args.current
-        self.reqnum = self.args.reqnum
-        self.relpath = self.args.relpath
-        self.unitname = self.args.unitname
-        self.attnum = self.args.attnum
-        self.verbose = self.args.verbose
-        self.debug = self.args.debug
-        self.script = self.args.script
-        self.pfwid = self.args.pfwid
-        self.silent = self.args.silent
-        self.tag = self.args.tag
-        self.archive_root = None
+        fmutils.FileManager.__init__(self, win, args, pfwids, event, que)
+        self.destination = args.destination
+        self.current = args.current
         self.results = {"null": [],
                         "comp": []}
         self.paths = {"null": [],
                       "comp": []}
-        self.count = 0
-        self.currnewpath = None
         self.copied_files = []
-        self.status = 0
-        self.iteration = 0
-        self.halt = False
-        self.number = 0
-        self.length = 1
-
-        if not self.pfwids:
-            _ = self.do_migration()
-        elif len(self.pfwids) == 1:
-            self.pfwid = self.pfwids[0]
-            self.args.pfwid = self.pfwid
-            _ = self.do_migration()
-        else:
-            self.pfwids.sort() # put them in order
-            self.multi_migrate()
-
-
-    def __del__(self):
-        if self.dbh:
-            self.dbh.close()
-
-    def update(self, msg=None, err=False):
-        """ Method to report the progress of the job
-
-        """
-        if self.silent:
-            return
-        if self.que is not None:
-            if msg is not None:
-                self.que.put_nowait(Message(self.win, f"Processing {self.pfwid}  ({self.number+1}/{self.length})\n{msg}", pfwid=self.pfwid, err=err))
-            else:
-                self.que.put_nowait(Message(self.win, None, self.pfwid, self.iteration, self.count))
-        else:
-            if msg is not None:
-                print(msg)
-            else:
-                self.printProgressBar()
-
-    def check_status(self):
-        """ Method to check whether the processing should continue
-        """
-        if self.halt:
-            return True
-        if self.event is not None:
-            if self.event.is_set():
-                self.rollback(self.currnewpath)
-        return self.halt
-
-    def printProgressBar(self, length = 100, fill = '█', printEnd = "\r"):
-        """ Print a progress bar
-        """
-        if self.silent:
-            return
-        percent = (f"{self.iteration:d}/{self.count:d}")
-        filledLength = int(length * self.iteration // self.count)
-        pbar = fill * filledLength + '-' * (length - filledLength)
-        print(f'\rProgress: |{pbar}| {percent}', end = printEnd)
+        self.md5sum = True
 
     def rollback(self, newpath=None):
         """ Method to undo any changes if something goes wrong
@@ -164,38 +50,15 @@ class Migration:
                 except:
                     bad_files.append(f)
             if newpath is not None:
-                removeEmptyFolders(os.path.join(self.archive_root, newpath))
+                fmutils.removeEmptyFolders(os.path.join(self.archive_root, newpath))
             if bad_files:
                 with open(f"{self.pfwid}.undel", 'w', encoding="utf-8") as fh:
                     for f in bad_files:
                         fh.write(f"    {f}\n")
                 self.update(f"Could not remove {len(bad_files)} copied files. See {self.pfwid}.undel for a list.", True)
 
-    def check_permissions(self, files_from_db):
-        """ Check the permissions of the initial files to make sure they can be read and written
-        """
-        bad_files = []
-        self.update("Checking file permissions")
-        self.iteration = 0
-        self.update()
-        for fname, items in files_from_db.items():
-            if self.check_status():
-                return False
-            if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
-                bad_files.append(fname)
-            self.iteration += 1
-            self.update()
 
-        if bad_files:
-            with open(f"{self.pfwid}.badperm", 'w', encoding="utf-8") as fh:
-                for f in bad_files:
-                    fh.write(f"{f}\n")
-
-            self.update(f"Some files do not have rw permissions. See {self.pfwid}.badperm for a list.", True)
-            return False
-        return True
-
-    def migrate(self, files_from_db):
+    def migrate(self):
         """ Function to copy files from one archive section to another.
 
             Parameters
@@ -215,7 +78,7 @@ class Migration:
         self.update(f"Copying {self.count} files...")
         self.iteration = 0
         self.update()
-        for fname, items in files_from_db.items():
+        for fname, items in self.files_from_db.items():
             if self.check_status():
                 return
             if self.current is not None:
@@ -248,7 +111,7 @@ class Migration:
             self.iteration += 1
             self.update()
 
-    def do_migration(self):
+    def do_task(self):
         """ Method to migrate the data
 
             Parameters
@@ -259,33 +122,39 @@ class Migration:
             -------
             the result
         """
+        self.copied_files = []
+        self.results = {"null": [],
+                        "comp": []}
+        self.paths = {"null": [],
+                      "comp": []}
+
         self.update("Gathering file info from DB")
-        self.archive_root, _, relpath, _, pfwid = compare.gather_data(self.dbh, self.args)
-        if not relpath:
-            self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {pfwid}', True)
+        self.gather_data()
+        if not self.relpath:
+            self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {self.pfwid}', True)
             return 1
         newpath = None
         if self.current is not None:
-            newpath = relpath.replace(self.current, self.destination)
+            newpath = self.relpath.replace(self.current, self.destination)
         else:
-            newpath = os.path.join(self.destination, relpath)
-        if newpath == relpath:
-            self.update(f"  ERROR: new path is the same as the original {newpath} == {relpath}", True)
+            newpath = os.path.join(self.destination, self.relpath)
+        if newpath == self.relpath:
+            self.update(f"  ERROR: new path is the same as the original {newpath} == {self.relpath}", True)
             return 1
         newarchpath = os.path.join(self.archive_root, newpath)
         self.currnewpath = newpath
 
-        files_from_db, _ = dbutils.get_files_from_db(self.dbh, relpath, self.archive, pfwid, None, debug=self.debug)
-        self.count = len(files_from_db)
+        self.get_files_from_db()
+        self.count = len(self.files_from_db)
 
         # make the root directory
         path = Path(newarchpath)
         path.mkdir(parents=True, exist_ok=True)
-        if not self.check_permissions(files_from_db):
+        if not self.check_permissions(self.files_from_db):
             return 0
         if self.check_status():
             return 1
-        self.migrate(files_from_db)
+        self.migrate()
         if self.check_status():
             return 1
         self.update("Updating database...")
@@ -298,7 +167,7 @@ class Migration:
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
                 curs = self.dbh.cursor()
                 curs.executemany(upsql, self.results['null'])
-            curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={pfwid}")
+            curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}")
         except:
             self.update("Error updating the database entries, rolling back any DB changes.", True)
             time.sleep(2)
@@ -307,11 +176,13 @@ class Migration:
         # get new file info from db
         if self.check_status():
             return 1
+        oldpath = self.relpath
+        self.relpath = newpath
         self.update("Running comparison of new files and database...")
-        files_from_db, _ = dbutils.get_files_from_db(self.dbh, newpath, self.archive, pfwid, None, debug=self.debug)
-        files_from_disk, duplicates = diskutils.get_files_from_disk(newpath, self.archive_root, True, self.debug)
+        self.get_files_from_db()
+        self.get_files_from_disk()
 
-        comparison_info = diskutils.compare_db_disk(files_from_db, files_from_disk, duplicates, True, self.debug, self.archive_root)
+        comparison_info = self.compare_db_disk()
         error = False
         if len(comparison_info['dbonly']) > 0:
             error = True
@@ -357,7 +228,7 @@ class Migration:
                 self.update()
             except:
                 cannot_del.append(r)
-        removeEmptyFolders(os.path.join(self.archive_root,relpath))
+        fmutils.removeEmptyFolders(os.path.join(self.archive_root, oldpath))
         self.status = 0
 
         if cannot_del:
@@ -366,33 +237,3 @@ class Migration:
                     fh.write(f"    {f}\n")
             self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
         return 0
-
-    def multi_migrate(self):
-        """ Method to iterate over pfw_attempt_id's and run the migration script
-
-            Parameters
-            ----------
-            dbh : database handle
-            pfwids : result of querying a table for pfw_attempt_ids, usually a list of single element tuples
-            args : an instance of Args containing the command line arguments
-
-            Returns
-            -------
-            A summary of the results of do_migration
-        """
-        self.length = len(self.pfwids)
-
-        for i, pdwi in enumerate(self.pfwids):
-            self.number = i
-            if self.check_status():
-                return
-            self.copied_files = []
-            self.results = {"null": [],
-                            "comp": []}
-            self.paths = {"null": [],
-                          "comp": []}
-            self.count = 0
-
-            self.pfwid = pdwi
-            self.args.pfwid = pdwi
-            self.do_migration()
