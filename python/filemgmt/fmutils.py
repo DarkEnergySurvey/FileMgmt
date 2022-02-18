@@ -569,6 +569,10 @@ class FileManager:
             self.count = 0
 
             self.pfwid = pdwi
+            self.relpath = None
+            self.reqnum = None
+            self.unitname = None
+            self.attnum = None
             retval += self.do_task()
         return retval
 
