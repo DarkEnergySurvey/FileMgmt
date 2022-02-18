@@ -72,15 +72,19 @@ class CompactLogs(fmutils.FileManager):
             self.update()
             fnames = []
             self.tarfile = f"log.{self.unitname}_r{self.reqnum}p{self.attnum:02d}.tar.gz"
-            with tarfile.open(self.tarfile, 'w:gz') as zfh:
-                for fname, items in self.files_from_db.items():
-                    fnames.append(os.path.join(self.archive_root, items['path'], fname))
-                    name = fnames[-1].replace(os.getcwd() + '/', '')
-                    zfh.add(name)
-                    #fnames.append(fname)
-                    self.iteration += 1
-                    self.results.append({'fid': items['id']})
-                    self.update()
+            try:
+                with tarfile.open(self.tarfile, 'w:gz') as zfh:
+                    for fname, items in self.files_from_db.items():
+                        fnames.append(os.path.join(self.archive_root, items['path'], fname))
+                        name = fnames[-1].replace(os.getcwd() + '/', '')
+                        zfh.add(name)
+                        self.iteration += 1
+                        self.results.append({'fid': items['id']})
+                        self.update()
+            except:
+                self.update("Error tarring the files")
+                self.rollback()
+                raise
 
             self.update("Updating database...")
             try:
