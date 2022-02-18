@@ -387,6 +387,7 @@ class FileManager:
     """
     def __init__(self, win, args, pfwids, event, que=None):
         self.pfwids = pfwids
+        self.cwd = os.getcwd()
         if args.dbh is None:
             self.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
         else:
@@ -539,7 +540,7 @@ class FileManager:
             self.update()
 
         if bad_files:
-            with open(f"{self.pfwid}.badperm", 'w', encoding="utf-8") as fh:
+            with open(os.path.join(self.cwd, f"{self.pfwid}.badperm"), 'w', encoding="utf-8") as fh:
                 for f in bad_files:
                     fh.write(f"{f}\n")
 

@@ -133,7 +133,7 @@ class CompactLogs(fmutils.FileManager):
             self.status = 0
 
             if cannot_del:
-                with open(f"{self.pfwid}.undel", 'w', encoding="utf-8") as fh:
+                with open(os.path.join(self.cwd, f"{self.pfwid}.undel"), 'w', encoding="utf-8") as fh:
                     for f in cannot_del:
                         fh.write(f"    {f}\n")
                 self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
