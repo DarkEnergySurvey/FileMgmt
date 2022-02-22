@@ -55,6 +55,8 @@ The following are all valid ways to select the files:
     parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the work, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
+    parser.add_argument('--live', action='store_true', help='Used to specify running on a live system')
+    parser.add_argument('--tarfile', action='store', help='Name of the tar file to create, if not specified one based on the reqnum, unitname, and attnum will be used.', default=None)
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False
@@ -71,6 +73,12 @@ def main():
         stdp = fmutils.Print(args.log)
         sys.stdout = stdp
     (args, pfwids) = fmutils.determine_ids(args)
+    if args.live:
+        if not args.pfwid:
+            raise Exception("pfwid must be specified")
+        cul = cu.CompactLogs(0, args, [args.pfwid], None)
+        cul.run()
+        return 0
     manager = mp.Manager()
     event = manager.Event()
 
