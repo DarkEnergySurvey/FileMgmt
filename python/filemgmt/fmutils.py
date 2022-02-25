@@ -441,6 +441,23 @@ class FileManager:
         self.duplicates = None
         self.comparison_info ={}
 
+    def reset(self):
+        self.dbh.close()
+        self.dbh = desdmdbi.DesDmDbi(self.des_services, self.section)
+        self.relpath = None
+        self.reqnum = None
+        self.unitname = None
+        self.attnum = None
+        self.files_from_db = None
+        self.db_duplicates = None
+        self.files_from_disk = None
+        self.duplicates = None
+        self.comparison_info ={}
+        self._reset()
+
+    def _reset(self):
+        pass
+
     def run(self):
         """ Execute the main task(s)
 
@@ -570,11 +587,8 @@ class FileManager:
             self.count = 0
 
             self.pfwid = pdwi
-            self.relpath = None
-            self.reqnum = None
-            self.unitname = None
-            self.attnum = None
             retval += self.do_task()
+            self.reset()
         return retval
 
     def get_paths_by_path(self):

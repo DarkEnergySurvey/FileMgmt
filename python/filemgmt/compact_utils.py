@@ -18,6 +18,10 @@ class CompactLogs(fmutils.FileManager):
         self.results = []
         self.live = args.live
 
+    def _reset(self):
+        self.results = []
+        self.tarfile = None
+
     def rollback(self, x=None):
         """ Method to undo any changes if something goes wrong
         """
