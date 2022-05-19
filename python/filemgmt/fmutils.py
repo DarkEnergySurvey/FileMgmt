@@ -394,7 +394,7 @@ def get_unique_paths(args):
         return args, []
     if args.dbh is None:
         args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
-    sql = f"select distinct(path) from file_archive_info where archive_name={args.archive} and path like 'RAW/{args.raw}%'"
+    sql = f"select distinct(path) from file_archive_info where archive_name='{args.archive}' and path like 'RAW/{args.raw}%'"
     curs = args.dbh.cursor()
     curs.execute(sql)
     results = curs.fetchall()
