@@ -309,8 +309,12 @@ def run(inputs):
     """ Method to launch a multiprocessing run
     """
     try:
-        (action, wn, args, pfwids, event, que) = inputs
-        runner = action(wn, args, pfwids, event, que)
+        if len(inputs) == 6:
+            (action, wn, args, pfwids, event, que) = inputs
+            runner = action(wn, args, pfwids, event, que)
+        else:
+            (action, wn, args, pfwids, event, rdirs, que) = inputs
+            runner = action(wn, args, pfwids, event, rdirs, que)
         return runner.run()
     finally:
         que.put_nowait(Message(wn, COMPLETE, 0))
@@ -381,11 +385,30 @@ def determine_ids(args):
 
     return args, pfwids
 
+
+def get_unique_paths(args):
+    """ Determine unique paths based on a fragment of a RAW file path
+        args: argparse object
+    """
+    if 'raw' not in args or args.raw is None:
+        return args, []
+    if args.dbh is None:
+        args.dbh = desdmdbi.DesDmDbi(args.des_services, args.section)
+    sql = f"select distinct(path) from file_archive_info where archive_name={args.archive} and path like 'RAW/{args.raw}%'"
+    curs = args.dbh.cursor()
+    curs.execute(sql)
+    results = curs.fetchall()
+    dirs = []
+    for r in results:
+        dirs.append(r[0])
+    return args, dirs
+
+
 class FileManager:
     """ Base class for multiple file management activities
 
     """
-    def __init__(self, win, args, pfwids, event, que=None):
+    def __init__(self, win, args, pfwids, event, dirs=None, que=None):
         self.pfwids = pfwids
         self.cwd = os.getcwd()
         if args.dbh is None:
@@ -421,10 +444,16 @@ class FileManager:
             self.md5sum = args.md5sum
         else:
             self.md5sum = False
+        if 'raw' in args:
+            self.raw = args.raw
+        else:
+            self.raw = None
+        self.dirs = dirs
         self.verbose = args.verbose
         self.debug = args.debug
         self.script = args.script
         self.pfwid = args.pfwid
+        self.rdir = None
         self.silent = args.silent
         self.tag = args.tag
         self.archive_root = None
@@ -462,12 +491,16 @@ class FileManager:
         """ Execute the main task(s)
 
         """
-        if not self.pfwids:
+        if not self.pfwids and not self.dirs:
             return self.do_task()
         if len(self.pfwids) == 1:
             self.pfwid = self.pfwids[0]
             return self.do_task()
-        self.pfwids.sort() # put them in order
+        if len(self.dirs) == 1:
+            self.rdir = self.dirs[0]
+            return self.do_task()
+        self.pfwids.sort()  # put them in order
+        self.dirs.sort()
         return self.multi_task()
 
     def __del__(self):
@@ -507,7 +540,8 @@ class FileManager:
             string containing the archive root
 
         """
-        if 'relpath' in self.__dict__ and self.relpath is not None:
+        if ('relpath' in self.__dict__ and self.relpath is not None) or \
+           ('dirs' in self.__dict__ and self.dirs is not None):
             self.get_paths_by_path()
         elif ('reqnum' in self.__dict__ and self.reqnum) or self.pfwid:
             self.get_paths_by_id()
@@ -536,7 +570,7 @@ class FileManager:
         """
         if self.silent:
             return
-        percent = (f"{self.iteration:d}/{self.count:d}")
+        percent = f"{self.iteration:d}/{self.count:d}"
         filledLength = int(length * self.iteration // self.count)
         pbar = fill * filledLength + '-' * (length - filledLength)
         print(f'\rProgress: |{pbar}| {percent}', end = printEnd)
@@ -578,17 +612,30 @@ class FileManager:
             -------
             A summary of the results of do_migration
         """
-        self.length = len(self.pfwids)
         retval = 0
-        for i, pdwi in enumerate(self.pfwids):
-            self.number = i
-            if self.check_status():
-                return 0
-            self.count = 0
+        if self.pfwids:
+            self.length = len(self.pfwids)
+            for i, pdwi in enumerate(self.pfwids):
+                self.number = i
+                if self.check_status():
+                    return 0
+                self.count = 0
 
-            self.pfwid = pdwi
-            retval += self.do_task()
-            self.reset()
+                self.pfwid = pdwi
+                retval += self.do_task()
+                self.reset()
+        if self.dirs:
+            self.length = len(self.dirs)
+            for i, rd in enumerate(self.dirs):
+                self.number = i
+                if self.check_status():
+                    return 0
+                self.count = 0
+
+                self.rdir = rd
+                retval += self.do_task()
+                self.reset()
+
         return retval
 
     def get_paths_by_path(self):
@@ -607,30 +654,34 @@ class FileManager:
             sys.exit(1)
 
         self.archive_root = rows[0][0]
-        # see if relpath is the root directory for an attempt
-        sql = f"select operator, id from pfw_attempt where archive_path={self.dbh.get_named_bind_string('apath')}"
-        curs.execute(sql, {'apath' : self.relpath,})
-        rows = curs.fetchall()
-        if not rows:
-            print(f"\nCould not find an attempt with an archive_path={self.relpath}")
-            print("Assuming that this is part of an attempt, continuing...\n")
-            self.operator = None
-            self.state = ""
-            self.pfwid = None
-        elif len(rows) > 1:
-            print("More than one pfw_attempt_id is assocaited with this path, use tag, or specify by pfw_attempt_id rather than a path")
-            print('\nAborting')
-            sys.exit(1)
+        if self.rdir:
+            self.archive_path = os.path.join(self.archive_root, self.rdir)
+            self.relpath = self.rdir
         else:
-            self.operator = rows[0][0]
-            self.pfwid = rows[0][1]
-
-            sql = f"select data_state from attempt_state where pfw_attempt_id={self.dbh.get_named_bind_string('pfwid')}"
-            curs.execute(sql, {'pfwid': self.pfwid})
+            # see if relpath is the root directory for an attempt
+            sql = f"select operator, id from pfw_attempt where archive_path={self.dbh.get_named_bind_string('apath')}"
+            curs.execute(sql, {'apath' : self.relpath,})
             rows = curs.fetchall()
-            self.state = rows[0][0]
+            if not rows:
+                print(f"\nCould not find an attempt with an archive_path={self.relpath}")
+                print("Assuming that this is part of an attempt, continuing...\n")
+                self.operator = None
+                self.state = ""
+                self.pfwid = None
+            elif len(rows) > 1:
+                print("More than one pfw_attempt_id is assocaited with this path, use tag, or specify by pfw_attempt_id rather than a path")
+                print('\nAborting')
+                sys.exit(1)
+            else:
+                self.operator = rows[0][0]
+                self.pfwid = rows[0][1]
 
-        self.archive_path = os.path.join(self.archive_root, self.relpath)
+                sql = f"select data_state from attempt_state where pfw_attempt_id={self.dbh.get_named_bind_string('pfwid')}"
+                curs.execute(sql, {'pfwid': self.pfwid})
+                rows = curs.fetchall()
+                self.state = rows[0][0]
+
+            self.archive_path = os.path.join(self.archive_root, self.relpath)
 
     def get_paths_by_id(self):
         """ Make sure command line arguments have valid values

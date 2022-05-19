@@ -13,8 +13,8 @@ from filemgmt import fmutils
 
 
 class Migration(fmutils.FileManager):
-    def __init__(self, win, args, pfwids, event, que=None):
-        fmutils.FileManager.__init__(self, win, args, pfwids, event, que)
+    def __init__(self, win, args, pfwids, event, dirs, que=None):
+        fmutils.FileManager.__init__(self, win, args, pfwids, event, dirs, que)
         self.destination = args.destination
         self.current = args.current
         self.results = {"null": [],
@@ -56,7 +56,6 @@ class Migration(fmutils.FileManager):
                     for f in bad_files:
                         fh.write(f"    {f}\n")
                 self.update(f"Could not remove {len(bad_files)} copied files. See {self.pfwid}.undel for a list.", True)
-
 
     def migrate(self):
         """ Function to copy files from one archive section to another.
@@ -167,7 +166,8 @@ class Migration(fmutils.FileManager):
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
                 curs = self.dbh.cursor()
                 curs.executemany(upsql, self.results['null'])
-            curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}")
+            if self.pfwid:
+                curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}")
         except:
             self.update("Error updating the database entries, rolling back any DB changes.", True)
             time.sleep(2)

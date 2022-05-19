@@ -68,6 +68,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the migration, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
+    parser.add_argument('--raw', action='store', default=None, help='Migrate RAW files')
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False
@@ -83,7 +84,12 @@ def main():
     if args.log is not None:
         stdp = fmutils.Print(args.log)
         sys.stdout = stdp
-    (args, pfwids) = fmutils.determine_ids(args)
+    if args.raw is None:
+        (args, pfwids) = fmutils.determine_ids(args)
+        rpaths = []
+    else:
+        (args, rpaths) = fmutils.get_unique_paths(args)
+        pfwids = []
     manager = mp.Manager()
     event = manager.Event()
 
@@ -93,7 +99,10 @@ def main():
     signal.signal(signal.SIGINT, interrupt)
 
     if args.parallel <= 1:
-        mul = mu.Migration(0, args, pfwids, event)
+        if rpaths:
+            mul = mu.Migration(0, args, [], event, rpaths)
+        else:
+            mul = mu.Migration(0, args, pfwids, event)
         mul.run()
     else:
         if args.parallel > 8:
@@ -102,8 +111,16 @@ def main():
         args.dbh = None
         npids = len(pfwids)
         jobs = []
+        rjobs = []
         for _ in range(args.parallel):
             jobs.append([])
+            rjobs.append([])
+        pos = 0
+        while rpaths:
+            rjobs[pos].append(rpaths.pop())
+            pos += 1
+            if pos >= args.parallel:
+                pos = 0
         pos = 0
         while pfwids:
             jobs[pos].append(pfwids.pop())
@@ -123,9 +140,8 @@ def main():
                 wins.append(curses.newwin(step, num_cols, i*step, 0))
 
             with mp.Pool(processes=len(jobs), maxtasksperchild=1) as pool:
-                _ = [pool.apply_async(fmutils.run, args=((mu.Migration, i, copy.deepcopy(args), jobs[i], event, queu,),), error_callback=fmutils.results_error) for i in range(len(jobs))]
+                _ = [pool.apply_async(fmutils.run, args=((mu.Migration, i, copy.deepcopy(args), jobs[i], event, rjobs[i], queu,),), error_callback=fmutils.results_error) for i in range(len(jobs))]
                 pool.close()
-                #pool.join()
                 while not all(done):
                     while True:
                         try:

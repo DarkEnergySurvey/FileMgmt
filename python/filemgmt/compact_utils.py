@@ -13,7 +13,7 @@ class CompactLogs(fmutils.FileManager):
 
     """
     def __init__(self, win, args, pfwids, event, que=None):
-        fmutils.FileManager.__init__(self, win, args, pfwids, event, que)
+        fmutils.FileManager.__init__(self, win, args, pfwids, event, que=que)
         self.tarfile = args.tarfile
         self.results = []
         self.live = args.live
