@@ -164,6 +164,11 @@ def main():
                         except queue.Empty:
                             break
                     time.sleep(0.2)
+        except Exception as ex:
+            with open("error.log", 'w') as fh:
+                fh.write(ex)
+            print("An exception occured see error.log for details.")
+
         finally:
             curses.endwin()
         if errors:

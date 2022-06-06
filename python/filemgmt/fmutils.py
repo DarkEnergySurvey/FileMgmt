@@ -297,11 +297,11 @@ class Message:
         self.pfwid = pfwid
 
 
-def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd = "\n"):
+def printProgressBar(win, iteration, count, length=100, fill='█', printEnd="\n"):
     """ Print a progress bar
     """
     if count > 0:
-        percent = (f"{iteration:d}/{count:d}")
+        percent = f"{iteration:d}/{count:d}"
         filledLength = int(length * iteration // count)
     else:
         percent = 0
@@ -495,17 +495,26 @@ class FileManager:
         """ Execute the main task(s)
 
         """
-        if not self.pfwids and not self.dirs:
-            return self.do_task()
-        if len(self.pfwids) == 1:
-            self.pfwid = self.pfwids[0]
-            return self.do_task()
-        if len(self.dirs) == 1:
-            self.rdir = self.dirs[0]
-            return self.do_task()
-        self.pfwids.sort()  # put them in order
-        self.dirs.sort()
-        return self.multi_task()
+        try:
+            if not self.pfwids and not self.dirs:
+                return self.do_task()
+            if len(self.pfwids) == 1:
+                self.pfwid = self.pfwids[0]
+                return self.do_task()
+            if len(self.dirs) == 1:
+                self.rdir = self.dirs[0]
+                return self.do_task()
+            self.pfwids.sort()  # put them in order
+            self.dirs.sort()
+            return self.multi_task()
+        except Exception as ex:
+            if self.pfwid is not None:
+                efname = f"{self.pfwid}.err"
+            else:
+                efname = f"{self.rdir}.err"
+            with open(efname, 'w') as fh:
+                fh.write(ex)
+            
 
     def __del__(self):
         if self.dbh:
