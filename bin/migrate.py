@@ -166,7 +166,7 @@ def main():
                     time.sleep(0.2)
         except Exception as ex:
             with open("error.log", 'w') as fh:
-                fh.write(ex)
+                fh.write(str(ex))
             print("An exception occured see error.log for details.")
 
         finally:

@@ -513,8 +513,8 @@ class FileManager:
             else:
                 efname = f"{self.rdir}.err"
             with open(efname, 'w') as fh:
-                fh.write(ex)
-            
+                fh.write(str(ex))
+
 
     def __del__(self):
         if self.dbh:
