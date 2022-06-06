@@ -98,10 +98,10 @@ class Migration(fmutils.FileManager):
                 self.copied_files.append(os.path.join(self.archive_root, dst, fname))
             except Exception as ex:
                 self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
+                with open(f"/home/friedel/{fname}.err", 'w') as fh:
+                    fh.write(str(ex))
                 time.sleep(2)
                 self.rollback()
-                with open(f"{fname.err}", 'w') as fh:
-                    fh.write(str(ex))
                 raise
             if compress is None:
                 self.results['null'].append({'pth': dst, 'fn':filename})#,
