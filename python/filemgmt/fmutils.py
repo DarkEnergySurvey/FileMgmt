@@ -596,12 +596,15 @@ class FileManager:
             self.update()
 
         if bad_files:
-            with open(os.path.join(self.cwd, f"{self.pfwid}.badperm"), 'w', encoding="utf-8") as fh:
+            if self.pfwid is not None:
+                fname = f"{self.pfwid}.badperm"
+            else:
+                fname = f"{self.rdir}.badperm"
+            with open(os.path.join(self.cwd, fname), 'w', encoding="utf-8") as fh:
                 for f in bad_files:
-                    #print(f"  BAD {f}") 
                     fh.write(f"{f}\n")
 
-            self.update(f"Some files do not have rw permissions. See {self.pfwid}.badperm for a list.", True)
+            self.update(f"Some files do not have rw permissions. See {fname} for a list.", True)
             return False
         return True
 
