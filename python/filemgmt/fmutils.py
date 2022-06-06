@@ -300,8 +300,12 @@ class Message:
 def printProgressBar(win, iteration, count, length = 100, fill = '█', printEnd = "\n"):
     """ Print a progress bar
     """
-    percent = (f"{iteration:d}/{count:d}")
-    filledLength = int(length * iteration // count)
+    if count > 0:
+        percent = (f"{iteration:d}/{count:d}")
+        filledLength = int(length * iteration // count)
+    else:
+        percent = 0
+        filledLength = 0
     pbar = fill * filledLength + '-' * (length - filledLength)
     win.addstr(2, 0, f"Progress: |{pbar}| {percent}{printEnd}")
 
@@ -568,7 +572,7 @@ class FileManager:
     def printProgressBar(self, length = 100, fill = '█', printEnd = "\r"):
         """ Print a progress bar
         """
-        if self.silent:
+        if self.silent or self.count == 0:
             return
         percent = f"{self.iteration:d}/{self.count:d}"
         filledLength = int(length * self.iteration // self.count)
@@ -586,6 +590,7 @@ class FileManager:
             if self.check_status():
                 return False
             if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
+                #print(os.path.join(self.archive_root, items['path'], fname))
                 bad_files.append(fname)
             self.iteration += 1
             self.update()
@@ -593,6 +598,7 @@ class FileManager:
         if bad_files:
             with open(os.path.join(self.cwd, f"{self.pfwid}.badperm"), 'w', encoding="utf-8") as fh:
                 for f in bad_files:
+                    #print(f"  BAD {f}") 
                     fh.write(f"{f}\n")
 
             self.update(f"Some files do not have rw permissions. See {self.pfwid}.badperm for a list.", True)

@@ -74,7 +74,7 @@ class Migration(fmutils.FileManager):
             archive_root: str
                 The archive root path
         """
-        self.update(f"Copying {self.count} files...")
+        self.update(f"Copying {self.count} files for {self.relpath}...")
         self.iteration = 0
         self.update()
         for fname, items in self.files_from_db.items():
@@ -129,6 +129,8 @@ class Migration(fmutils.FileManager):
 
         self.update("Gathering file info from DB")
         self.gather_data()
+        if '20140203' in self.relpath:
+            return 1
         if not self.relpath:
             self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {self.pfwid}', True)
             return 1
@@ -178,7 +180,7 @@ class Migration(fmutils.FileManager):
             return 1
         oldpath = self.relpath
         self.relpath = newpath
-        self.update("Running comparison of new files and database...")
+        self.update(f"Running comparison of new files and database for {self.relpath}...")
         self.get_files_from_db()
         self.get_files_from_disk()
 
