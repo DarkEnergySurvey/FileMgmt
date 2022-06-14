@@ -123,6 +123,8 @@ class Migration(fmutils.FileManager):
             -------
             the result
         """
+        start = time.time()
+
         self.copied_files = []
         self.results = {"null": [],
                         "comp": []}
@@ -158,6 +160,9 @@ class Migration(fmutils.FileManager):
         if self.check_status():
             return 1
         self.migrate()
+        size_sum = 0
+        for v in self.files_from_db.values():
+            size_sum += v['filesize']
         if self.check_status():
             return 1
         self.update("Updating database...")
@@ -240,4 +245,11 @@ class Migration(fmutils.FileManager):
                 for f in cannot_del:
                     fh.write(f"    {f}\n")
             self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
+        end = time.time()
+        curs = self.dbh.cursor()
+        typ = 'production'
+        if self.raw:
+            typ = 'raw'
+        curs.execute(f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ({typ}, {self.count}, {size_sum}, {end-start})")
+
         return 0
