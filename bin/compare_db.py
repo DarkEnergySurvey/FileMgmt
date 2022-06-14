@@ -7,7 +7,7 @@
 import sys
 import argparse
 import filemgmt.compare_utils as compare
-
+from filemgmt import fmutils
 
 
 def parse_cmd_line(argv):
@@ -15,7 +15,7 @@ def parse_cmd_line(argv):
 
         Parameters
         ----------
-        args : command line arguments
+        argv : command line arguments
 
         Returns
         -------
