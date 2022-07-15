@@ -69,6 +69,8 @@ The following are all valid ways to select the files:
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the migration, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
     parser.add_argument('--raw', action='store', default=None, help='Migrate RAW files')
+    parser.add_argument('--user', action='store', default=None, help='User to change ownership to. Default is no chnage.')
+    parser.add_argument('--group', action='store', default=None, help='Group to change ownership to. Default is no change.')
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False

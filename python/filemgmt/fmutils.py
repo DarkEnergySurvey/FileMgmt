@@ -408,11 +408,17 @@ def get_unique_paths(args):
     return args, dirs
 
 
+def check_arg(args, argname):
+    if argname in args:
+        return args.__dict__[argname]
+    return None
+
+
 class FileManager:
     """ Base class for multiple file management activities
 
     """
-    def __init__(self, win, args, pfwids, event, dirs=None, que=None):
+    def __init__(self, win, args, pfwids, event, dirs=[], que=None):
         self.pfwids = pfwids
         self.cwd = os.getcwd()
         if args.dbh is None:
@@ -428,30 +434,15 @@ class FileManager:
         self.operator = None
         self.state = None
         self.archive_path = None
-        if 'relpath' in args:
-            self.relpath = args.relpath
-        else:
-            self.relpath = None
-        if 'reqnum' in args:
-            self.reqnum = args.reqnum
-        else:
-            self.reqnum = None
-        if 'unitname' in args:
-            self.unitname = args.unitname
-        else:
-            self.unitname = None
-        if 'attnum' in args:
-            self.attnum = args.attnum
-        else:
-            self.attnum = None
-        if 'md5sum' in args:
-            self.md5sum = args.md5sum
-        else:
-            self.md5sum = False
-        if 'raw' in args:
-            self.raw = args.raw
-        else:
-            self.raw = None
+        self.relpath = check_arg(args, 'relpath')
+        self.reqnum = check_arg(args, 'reqnum')
+        self.unitname = check_arg(args, 'unitname')
+        self.attnum = check_arg(args, 'attnum')
+        self.md5sum = check_arg(args, 'md5sum')
+        self.raw = check_arg(args, 'raw')
+        self.user = check_arg(args, 'user')
+        self.group = check_arg(args, 'group')
+
         self.dirs = dirs
         self.verbose = args.verbose
         self.debug = args.debug
@@ -554,7 +545,7 @@ class FileManager:
 
         """
         if ('relpath' in self.__dict__ and self.relpath is not None) or \
-           ('dirs' in self.__dict__ and self.dirs is not None):
+           ('dirs' in self.__dict__ and self.dirs):
             self.get_paths_by_path()
         elif ('reqnum' in self.__dict__ and self.reqnum) or self.pfwid:
             self.get_paths_by_id()
@@ -678,7 +669,7 @@ class FileManager:
         else:
             # see if relpath is the root directory for an attempt
             sql = f"select operator, id from pfw_attempt where archive_path={self.dbh.get_named_bind_string('apath')}"
-            curs.execute(sql, {'apath' : self.relpath,})
+            curs.execute(sql, {'apath': self.relpath})
             rows = curs.fetchall()
             if not rows:
                 print(f"\nCould not find an attempt with an archive_path={self.relpath}")

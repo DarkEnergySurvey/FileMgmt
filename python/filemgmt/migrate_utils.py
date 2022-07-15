@@ -5,7 +5,7 @@
 import os
 import shutil
 from pathlib import Path
-#import datetime
+import stat
 import time
 
 from despymisc import miscutils
@@ -95,6 +95,14 @@ class Migration(fmutils.FileManager):
                 raise
             try:
                 shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
+                os.chmod(os.path.join(self.archive_root, dst, fname), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
+                if self.user is not None and self.group is not None:
+                    shutil.chown(os.path.join(self.archive_root, dst, fname), self.user, self.group)
+                if self.user is not None or self.group is not None:
+                    if self.group is not None:
+                        shutil.chown(os.path.join(self.archive_root, dst, fname), group=self.group)
+                    else:
+                        shutil.chown(os.path.join(self.archive_root, dst, fname), self.user)
                 self.copied_files.append(os.path.join(self.archive_root, dst, fname))
             except Exception as ex:
                 self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
