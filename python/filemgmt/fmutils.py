@@ -502,7 +502,7 @@ class FileManager:
             if self.pfwid is not None:
                 efname = f"{self.pfwid}.err"
             else:
-                efname = f"{self.rdir}.err"
+                efname = f"{os.path.basename(self.rdir)}.err"
             with open(efname, 'w') as fh:
                 fh.write(str(ex))
 
@@ -590,7 +590,6 @@ class FileManager:
             if self.check_status():
                 return False
             if not os.access(os.path.join(self.archive_root, items['path'], fname), os.R_OK|os.W_OK):
-                #print(os.path.join(self.archive_root, items['path'], fname))
                 bad_files.append(fname)
             self.iteration += 1
             self.update()
@@ -599,7 +598,7 @@ class FileManager:
             if self.pfwid is not None:
                 fname = f"{self.pfwid}.badperm"
             else:
-                fname = f"{self.rdir}.badperm"
+                fname = f"{os.path.basename(self.rdir)}.badperm"
             with open(os.path.join(self.cwd, fname), 'w', encoding="utf-8") as fh:
                 for f in bad_files:
                     fh.write(f"{f}\n")
@@ -814,6 +813,7 @@ class FileManager:
             if fdict['compression'] is not None:
                 fname += fdict['compression']
             filelist.append(fname)
+            
             self.files_from_db[fname] = fdict
             if "path" in fdict:
                 if fdict["path"][-1] == '/':
