@@ -92,6 +92,10 @@ def main():
     else:
         (args, rpaths) = fmutils.get_unique_paths(args)
         pfwids = []
+    if not rpaths and not pfwids:
+        print("No items found to migrate")
+        sys.exit(0)
+
     manager = mp.Manager()
     event = manager.Event()
 
@@ -104,7 +108,7 @@ def main():
         if rpaths:
             mul = mu.Migration(0, args, [], event, rpaths)
         else:
-            mul = mu.Migration(0, args, pfwids, event)
+            mul = mu.Migration(0, args, pfwids, event, [])
         mul.run()
     else:
         if args.parallel > 8:

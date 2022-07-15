@@ -141,8 +141,6 @@ class Migration(fmutils.FileManager):
 
         self.update("Gathering file info from DB")
         self.gather_data()
-        if '20140203' in self.relpath:
-            return 1
         if not self.relpath:
             self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {self.pfwid}', True)
             return 1
@@ -258,6 +256,8 @@ class Migration(fmutils.FileManager):
         typ = 'production'
         if self.raw:
             typ = 'raw'
-        curs.execute(f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ({typ}, {self.count}, {size_sum}, {end-start})")
+        sql = f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ('{typ}', {sel
+        curs.execute(sql)
+        curs.execute('commit')
 
         return 0
