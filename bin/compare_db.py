@@ -7,42 +7,7 @@
 import sys
 import argparse
 import filemgmt.compare_utils as compare
-
-class Print:
-    """ Class to capture printed output and write it to a log file
-
-        Parameters
-        ----------
-        logfile : str
-            The log file to write to
-
-    """
-    def __init__(self, logfile):
-        self.old_stdout = sys.stdout
-        self.logfile = open(logfile, 'w')
-
-    def write(self, text):
-        """ Method to capture, reformat, and write out the requested text
-
-            Parameters
-            ----------
-            test : str
-                The text to reformat
-
-        """
-        self.logfile.write(text)
-
-    def close(self):
-        """ Method to return stdout to its original handle
-
-        """
-        return self.old_stdout
-
-    def flush(self):
-        """ Method to force the buffer to flush
-
-        """
-        self.old_stdout.flush()
+from filemgmt import fmutils
 
 
 def parse_cmd_line(argv):
@@ -50,7 +15,7 @@ def parse_cmd_line(argv):
 
         Parameters
         ----------
-        args : command line arguments
+        argv : command line arguments
 
         Returns
         -------
@@ -112,9 +77,11 @@ def main():
     """
     args = parse_cmd_line(sys.argv[1:])
     if args.log is not None:
-        stdp = Print(args.log)
+        stdp = compare.Print(args.log)
         sys.stdout = stdp
-    ret = compare.run_compare(args)
+    (args, pfwids) = fmutils.determine_ids(args)
+    comp = compare.FileCompare(args, pfwids)
+    ret = compare.run()
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()
