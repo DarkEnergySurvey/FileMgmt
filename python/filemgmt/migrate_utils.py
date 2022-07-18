@@ -256,7 +256,7 @@ class Migration(fmutils.FileManager):
         typ = 'production'
         if self.raw:
             typ = 'raw'
-        sql = f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ('{typ}', {sel
+        sql = f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ('{typ}', {self.count}, {size_sum}, {end-start})"
         curs.execute(sql)
         curs.execute('commit')
 
