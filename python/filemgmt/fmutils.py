@@ -384,8 +384,11 @@ def determine_ids(args):
             args.reqnum = None
             args.unitname = None
             args.attnum = None
-        elif args.pfwid and ',' in args.pfwid:
-            pfwids = args.pfwid.split(',')
+        elif args.pfwid:
+            if ',' in args.pfwid:
+                pfwids = args.pfwid.split(',')
+            else:
+                pfwids = [args.pfwid]
 
     return args, pfwids
 
