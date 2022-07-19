@@ -443,8 +443,7 @@ class FileManager:
         self.attnum = check_arg(args, 'attnum')
         self.md5sum = check_arg(args, 'md5sum')
         self.raw = check_arg(args, 'raw')
-        self.user = check_arg(args, 'user')
-        self.group = check_arg(args, 'group')
+        self.chown = check_arg(args, 'chown')
 
         self.dirs = dirs
         self.verbose = args.verbose
@@ -466,7 +465,7 @@ class FileManager:
         self.db_duplicates = None
         self.files_from_disk = None
         self.duplicates = None
-        self.comparison_info ={}
+        self.comparison_info = {}
 
     def reset(self):
         self.dbh.close()
@@ -479,7 +478,7 @@ class FileManager:
         self.db_duplicates = None
         self.files_from_disk = None
         self.duplicates = None
-        self.comparison_info ={}
+        self.comparison_info = {}
         self._reset()
 
     def _reset(self):

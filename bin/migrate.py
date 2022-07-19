@@ -16,12 +16,13 @@ import datetime
 from filemgmt import fmutils
 from filemgmt import migrate_utils as mu
 
+
 def parse_cmd_line(argv):
     """ Parse command line arguments
 
         Parameters
         ----------
-        args : command line arguments
+        argv : command line arguments
 
         Returns
         -------
@@ -65,12 +66,11 @@ The following are all valid ways to select the files:
     parser.add_argument('--pfwid', action='store', help='pfw attempt id to search for')
     parser.add_argument('--silent', action='store_true', help='Run with minimal printing, only print ERROR or OK')
     parser.add_argument('--tag', action='store', help='Compare all data from a specific tag (this can take a long time)')
-    parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS) # used internally
+    parser.add_argument('--dbh', action='store', help=argparse.SUPPRESS)  # used internally
     parser.add_argument('--log', action='store', help='Log file to write to, default is to write to sdtout')
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the migration, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
     parser.add_argument('--raw', action='store', default=None, help='Migrate RAW files')
-    parser.add_argument('--user', action='store', default=None, help='User to change ownership to. Default is no chnage.')
-    parser.add_argument('--group', action='store', default=None, help='Group to change ownership to. Default is no change.')
+    parser.add_argument('--chown', action='store_true', default=False, help='User to change ownership to. Default is no chnage.')
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False
@@ -195,6 +195,7 @@ def main():
         sys.stdout.flush()
         sys.stdout = stdp.close()
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
