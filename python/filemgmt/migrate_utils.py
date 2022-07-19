@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 import stat
 import time
+import subprocess
 
 from despymisc import miscutils
 from filemgmt import fmutils
@@ -60,19 +61,6 @@ class Migration(fmutils.FileManager):
     def migrate(self):
         """ Function to copy files from one archive section to another.
 
-            Parameters
-            ----------
-            files_from_db: dict
-                Dictionary of files and descriptors to copy
-
-            current: str
-                The current root path of the files
-
-            destination: str
-                The destination path for the files
-
-            archive_root: str
-                The archive root path
         """
         self.update(f"Copying {self.count} files for {self.relpath}...")
         self.iteration = 0
@@ -96,13 +84,6 @@ class Migration(fmutils.FileManager):
             try:
                 shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
                 os.chmod(os.path.join(self.archive_root, dst, fname), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
-                if self.user is not None and self.group is not None:
-                    shutil.chown(os.path.join(self.archive_root, dst, fname), self.user, self.group)
-                if self.user is not None or self.group is not None:
-                    if self.group is not None:
-                        shutil.chown(os.path.join(self.archive_root, dst, fname), group=self.group)
-                    else:
-                        shutil.chown(os.path.join(self.archive_root, dst, fname), self.user)
                 self.copied_files.append(os.path.join(self.archive_root, dst, fname))
             except Exception as ex:
                 self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
@@ -122,10 +103,6 @@ class Migration(fmutils.FileManager):
 
     def do_task(self):
         """ Method to migrate the data
-
-            Parameters
-            ----------
-            args : list of command line arguments
 
             Returns
             -------
@@ -173,16 +150,26 @@ class Migration(fmutils.FileManager):
             return 1
         self.update("Updating database...")
         try:
+            curs = self.dbh.cursor()
             if self.results['comp'] :
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
-                curs = self.dbh.cursor()
                 curs.executemany(upsql, self.results['comp'])
             if self.results['null'] :
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
-                curs = self.dbh.cursor()
                 curs.executemany(upsql, self.results['null'])
             if self.pfwid:
                 curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}")
+                if self.chown:
+                    subp = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown.sh", newarchpath])
+                    while subp.poll() is None:
+                        try:
+                            subp.wait(100)
+                        except subprocess.TimeoutExpired:
+                            self.update("chown process is taking longer than expected.")
+                    retc = subp.poll()
+                    if retc != 0:
+                        self.update(f"chown failed for {newpath}, you may need to run it manually.")
+
         except:
             self.update("Error updating the database entries, rolling back any DB changes.", True)
             time.sleep(2)
