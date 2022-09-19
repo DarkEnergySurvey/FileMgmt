@@ -95,7 +95,7 @@ def main():
     else:
         (args, rpaths) = fmutils.get_unique_paths(args)
         pfwids = []
-    if not rpaths and not pfwids:
+    if not rpaths and not pfwids and not args.relpath:
         print("No items found to migrate")
         sys.exit(0)
 

@@ -210,13 +210,13 @@ class Migration(fmutils.FileManager):
             if self.results['comp']:
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
                 if self.dryrun:
-                    self.update(f"SQL: {upsql}")
+                    self.update(f"SQL: {upsql}  {self.results['comp']}")
                 else:
                     curs.executemany(upsql, self.results['comp'])
             if self.results['null']:
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
                 if self.dryrun:
-                    self.update(f"SQL: {upsql}")
+                    self.update(f"SQL: {upsql}  {self.results['null']}")
                 else:
                     curs.executemany(upsql, self.results['null'])
             if self.pfwid:
@@ -246,7 +246,7 @@ class Migration(fmutils.FileManager):
             raise
         # get new file info from db
         if self.check_status():
-            return 1
+            return 0
         oldpath = self.relpath
         self.relpath = newpath
         self.update(f"Running comparison of new files and database for {self.relpath}...")
