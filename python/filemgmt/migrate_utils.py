@@ -74,29 +74,35 @@ class Migration(fmutils.FileManager):
                 dst = self.destination + items['path']
             (_, filename, compress) = miscutils.parse_fullname(fname, miscutils.CU_PARSE_PATH | miscutils.CU_PARSE_FILENAME | miscutils.CU_PARSE_COMPRESSION)
             path = Path(os.path.join(self.archive_root, dst))
-            try:
-                path.mkdir(parents=True, exist_ok=True)
-            except:
-                self.update(f"Error making directory {os.path.join(self.archive_root, dst)}", True)
-                time.sleep(2)
-                self.rollback()
-                raise
-            try:
-                shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
-                os.chmod(os.path.join(self.archive_root, dst, fname), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
-                self.copied_files.append(os.path.join(self.archive_root, dst, fname))
-            except Exception as ex:
-                self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
-                with open(f"/home/rgruendl/migrate_work/{fname}.err", 'w') as fh:
-                    fh.write(str(ex))
-                time.sleep(2)
-                self.rollback()
-                raise
+            if self.dryrun:
+                self.update(f"Mkdir {path}")
+            else:
+                try:
+                    path.mkdir(parents=True, exist_ok=True)
+                except:
+                    self.update(f"Error making directory {os.path.join(self.archive_root, dst)}", True)
+                    time.sleep(2)
+                    self.rollback()
+                    raise
+            if self.dryrun:
+                self.update(f"Copying {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
+            else:
+                try:
+                    shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
+                    os.chmod(os.path.join(self.archive_root, dst, fname), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
+                    self.copied_files.append(os.path.join(self.archive_root, dst, fname))
+                except Exception as ex:
+                    self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
+                    with open(f"/home/rgruendl/migrate_work/{fname}.err", 'w') as fh:
+                        fh.write(str(ex))
+                    time.sleep(2)
+                    self.rollback()
+                    raise
             if compress is None:
-                self.results['null'].append({'pth': dst, 'fn':filename})#,
+                self.results['null'].append({'pth': dst, 'fn': filename})
                 self.paths['null'].append({'orig': items['path']})
             else:
-                self.results['comp'].append({'pth': dst, 'fn':filename, 'comp':compress})
+                self.results['comp'].append({'pth': dst, 'fn': filename, 'comp': compress})
                 self.paths['comp'].append({'orig': items['path']})
             self.iteration += 1
             self.update()
@@ -118,12 +124,12 @@ class Migration(fmutils.FileManager):
 
         self.update("Gathering file info from DB")
         self.gather_data()
-        if (self.pfwid is not None):
+        if self.pfwid is not None:
             print("RAG test: PFWID = {:}".format(self.pfwid))
         if not self.relpath:
             self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {self.pfwid}', True)
             return 1
-        newpath = None
+
         if self.current is not None:
             newpath = self.relpath.replace(self.current, self.destination)
         else:
@@ -142,19 +148,22 @@ class Migration(fmutils.FileManager):
 #        print('path: ',path)
 #        print('newpath: ',newpath)
 #        path.mkdir(parents=True, exist_ok=True)
-        try:
-            sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/mkdir.sh", path])
-            while sub_fd.poll() is None:
-                sub_fd.wait(1)
-            ret_fd=sub_fd.poll()
-            if (ret_fd !=0 ):
-                print("mkdir failed for path {:}".format(path))
-#                print("mkdir failed for path {:s}".format(path))
-#               raise
-        except:
-            print("Failed to mkdir for path: {:}".format(path))
-#            print("Failed to mkdir for path: {:s}".format(path))
-#            raise
+        if self.dryrun:
+            self.update(f"Make dir {path}")
+        else:
+            try:
+                sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/mkdir.sh", path])
+                while sub_fd.poll() is None:
+                    sub_fd.wait(0.1)
+                ret_fd = sub_fd.poll()
+                if ret_fd != 0:
+                    print("mkdir failed for path {:}".format(path))
+            #                print("mkdir failed for path {:s}".format(path))
+            #               raise
+            except:
+                print("Failed to mkdir for path: {:}".format(path))
+            #            print("Failed to mkdir for path: {:s}".format(path))
+            #            raise
 
         if not self.check_permissions(self.files_from_db):
             return 0
@@ -172,47 +181,63 @@ class Migration(fmutils.FileManager):
 #       - top is likely an existing link
 #       - bottom gets chowned by migrate...
         if self.chown:
-            try:
-                psycho_path=newpath.split("/")
-                print("psycho_path: {:}".format(psycho_path))
-#                fix_dir=self.archive_root
-                fix_dir=os.path.join(self.archive_root,psycho_path[0])
-                for sdir_part in psycho_path[1:-1]:
-                    fix_dir=os.path.join(fix_dir,sdir_part)
-                    print("fix_dir: ",fix_dir)
-                    sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown_dir.sh", fix_dir])
-                    while sub_fd.poll() is None:
-                        sub_fd.wait(1)
-                    ret_fd=sub_fd.poll()
-                    if (ret_fd !=0 ):
-                        print("chown failed for path {:}".format(fix_dir))
-#                        print("chown failed for path {:s}".format(fix_dir))
-            except:
-                print("Failed to chown subdirectory level: {:}".format(fix_dir))
-#                print("Failed to chown subdirectory level: {:s}".format(fix_dir))
-
+            if self.dryrun:
+                self.update(f"Chown {newpath}")
+            else:
+                try:
+                    psycho_path = newpath.split("/")
+                    print("psycho_path: {:}".format(psycho_path))
+                    # fix_dir=self.archive_root
+                    fix_dir = os.path.join(self.archive_root, psycho_path[0])
+                    for sdir_part in psycho_path[1:-1]:
+                        fix_dir = os.path.join(fix_dir, sdir_part)
+                        print("fix_dir: ", fix_dir)
+                        sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown_dir.sh", fix_dir])
+                        while sub_fd.poll() is None:
+                            sub_fd.wait(1)
+                        ret_fd = sub_fd.poll()
+                        if ret_fd != 0:
+                            print("chown failed for path {:}".format(fix_dir))
+                        # print("chown failed for path {:s}".format(fix_dir))
+                except:
+                    print("Failed to chown subdirectory level: {:}".format(fix_dir))
+                    # print("Failed to chown subdirectory level: {:s}".format(fix_dir))
 
         self.update("Updating database...")
         try:
-            curs = self.dbh.cursor()
-            if self.results['comp'] :
+            if not self.dryrun:
+                curs = self.dbh.cursor()
+            if self.results['comp']:
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression=:comp"
-                curs.executemany(upsql, self.results['comp'])
-            if self.results['null'] :
+                if self.dryrun:
+                    self.update(f"SQL: {upsql}")
+                else:
+                    curs.executemany(upsql, self.results['comp'])
+            if self.results['null']:
                 upsql = "update file_archive_info set path=:pth where filename=:fn and compression is NULL"
-                curs.executemany(upsql, self.results['null'])
+                if self.dryrun:
+                    self.update(f"SQL: {upsql}")
+                else:
+                    curs.executemany(upsql, self.results['null'])
             if self.pfwid:
-                curs.execute(f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}")
+                upsql = f"update pfw_attempt set archive_path='{newpath}' where id={self.pfwid}"
+                if self.dryrun:
+                    self.update(f"SQL: {upsql}")
+                else:
+                    curs.execute(upsql)
                 if self.chown:
-                    subp = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown.sh", newarchpath])
-                    while subp.poll() is None:
-                        try:
-                            subp.wait(100)
-                        except subprocess.TimeoutExpired:
-                            self.update("chown process is taking longer than expected.")
-                    retc = subp.poll()
-                    if retc != 0:
-                        self.update(f"chown failed for {newpath}, you may need to run it manually.")
+                    if self.dryrun:
+                        self.update(f"Chown {newarchpath}")
+                    else:
+                        subp = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown.sh", newarchpath])
+                        while subp.poll() is None:
+                            try:
+                                subp.wait(100)
+                            except subprocess.TimeoutExpired:
+                                self.update("chown process is taking longer than expected.")
+                        retc = subp.poll()
+                        if retc != 0:
+                            self.update(f"chown failed for {newpath}, you may need to run it manually.")
 
         except:
             self.update("Error updating the database entries, rolling back any DB changes.", True)
@@ -228,6 +253,8 @@ class Migration(fmutils.FileManager):
         self.get_files_from_db()
         self.get_files_from_disk()
 
+        if self.dryrun:
+            return 0
         self.compare_db_disk()
         error = False
         if len(self.comparison_info['dbonly']) > 0:

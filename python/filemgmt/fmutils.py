@@ -1,8 +1,3 @@
-# $Id: fmutils.py 46644 2018-03-12 19:54:58Z friedel $
-# $Rev:: 46644                            $:  # Revision of last commit.
-# $LastChangedBy:: friedel                $:  # Author of last commit.
-# $LastChangedDate:: 2018-03-12 14:54:58 #$:  # Date of last commit.
-
 """ Miscellaneous FileMgmt utils """
 
 import json
@@ -444,6 +439,7 @@ class FileManager:
         self.md5sum = check_arg(args, 'md5sum')
         self.raw = check_arg(args, 'raw')
         self.chown = check_arg(args, 'chown')
+        self.dryrun = check_arg(args, 'dryrun')
 
         self.dirs = dirs
         self.verbose = args.verbose

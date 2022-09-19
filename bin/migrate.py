@@ -60,6 +60,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--reqnum', action='store', help='Request number to search for')
     parser.add_argument('--unitname', action='store', help='Unit name to search for')
     parser.add_argument('--attnum', action='store', help='Attempt number to search for')
+    parser.add_argument('--relpath', action='store', help='Relative path to files on disk within archive. All subdirectories below this will also be migrated.')
     parser.add_argument('--verbose', action='store_true', help='print differences between db and disk')
     parser.add_argument('--debug', action='store_true', help='print all files, recommend >= 300 char wide terminal')
     parser.add_argument('--script', action='store_true', help='Print only if there are errors, usefule for running in loops in scripts')
@@ -71,6 +72,7 @@ The following are all valid ways to select the files:
     parser.add_argument('--parallel', action='store', help='Specify the parallelization of the migration, e.g. 3 would spread the work across 3 subprocesses.', type=int, default=1)
     parser.add_argument('--raw', action='store', default=None, help='Migrate RAW files')
     parser.add_argument('--chown', action='store_true', default=False, help='User to change ownership to. Default is no chnage.')
+    parser.add_argument('--dryrun', action='store_true', default=False, help='Dry run mechanism for testing, no changes will be made.')
     cargs = parser.parse_args(argv)
     if cargs.script:
         cargs.verbose = False
@@ -83,6 +85,7 @@ def main():
     """
     start = datetime.datetime.now()
     args = parse_cmd_line(sys.argv[1:])
+
     if args.log is not None:
         stdp = fmutils.Print(args.log)
         sys.stdout = stdp
