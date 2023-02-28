@@ -119,6 +119,10 @@ def main():
         args.dbh.close()
         args.dbh = None
         npids = len(pfwids)
+        if pfwids:
+            args.parallel = min(len(pfwids), args.parallel)
+        elif rpaths:
+            args.parallel = min(len(rpaths), args.parallel)
         jobs = []
         rjobs = []
         for _ in range(args.parallel):
