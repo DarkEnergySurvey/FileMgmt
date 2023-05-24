@@ -4,8 +4,8 @@ from filemgmt import fmutils
 
 
 class FileCompare(fmutils.FileManager):
-    def __init__(self, args, pfwids):
-        fmutils.FileManager.__init__(self, 0, args, pfwids, None, None)
+    def __init__(self, args, pfwids, event):
+        fmutils.FileManager.__init__(self, 0, args, pfwids, event, None, None)
         self.start_at = args.start_at
         self.end_at = args.end_at
         self.date_range = args.date_range
@@ -140,11 +140,15 @@ class FileCompare(fmutils.FileManager):
                 fdb = self.files_from_db[fname]
                 fdisk = self.files_from_disk[fname]
                 print(f"\t{fname}\t{fdb['path']}\t{fdisk['relpath']}{addon}")
-            if self.comparison_info['duplicates']:
+            if self.duplicates: #comparison_info['duplicates']:
+                listing = {}
                 print("  The following files have multiple disk paths on disk (path  filesize):")
-                for fname in self.comparison_info['duplicates']:
+                print(self.comparison_info['duplicates'])
+                for fname,itm in self.duplicates.items():
+                    print(fname)
+                    print(itm)
                     pdup.append(fname)
-                    listing[self.comparison_info['duplicates']['relpath']] = self.comparison_info['duplicates']['filesize']
+                    listing[itm['relpath']] = itm['filesize']
                 first = True
                 for pth in sorted(listing):
                     start = " "

@@ -30,7 +30,7 @@ class Migration(fmutils.FileManager):
         """
         if self.halt:
             return
-        self.halt = True
+        #self.halt = True
         if self.status != 0:
             self.update("The process cannot be interrupted at this stage")
             return
@@ -57,6 +57,7 @@ class Migration(fmutils.FileManager):
                     for f in bad_files:
                         fh.write(f"    {f}\n")
                 self.update(f"Could not remove {len(bad_files)} copied files. See {self.pfwid}.undel for a list.", True)
+        self.update("Rollback complete")
 
     def migrate(self):
         """ Function to copy files from one archive section to another.
@@ -79,13 +80,17 @@ class Migration(fmutils.FileManager):
             else:
                 try:
                     path.mkdir(parents=True, exist_ok=True)
-                except:
+                except Exception as ex:
                     self.update(f"Error making directory {os.path.join(self.archive_root, dst)}", True)
                     time.sleep(2)
-                    self.rollback()
-                    raise
+                    try:
+                        self.rollback()
+                    except:
+                        pass
+                    raise ex
             if self.dryrun:
-                self.update(f"Copying {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
+                pass
+                #self.update(f"Copying {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}")
             else:
                 try:
                     shutil.copy2(os.path.join(self.archive_root, items['path'], fname), os.path.join(self.archive_root, dst, fname))
@@ -93,11 +98,14 @@ class Migration(fmutils.FileManager):
                     self.copied_files.append(os.path.join(self.archive_root, dst, fname))
                 except Exception as ex:
                     self.update(f"Error copying file from {os.path.join(self.archive_root, items['path'], fname)} to {os.path.join(self.archive_root, dst, fname)}", True)
-                    with open(f"/home/rgruendl/migrate_work/{fname}.err", 'w') as fh:
-                        fh.write(str(ex))
+                    #with open(f"/home/friedel/migrate_work/{fname}.err", 'w') as fh:
+                    #    fh.write(str(ex))
                     time.sleep(2)
-                    self.rollback()
-                    raise
+                    try:
+                        self.rollback()
+                    except:
+                        pass
+                    raise ex
             if compress is None:
                 self.results['null'].append({'pth': dst, 'fn': filename})
                 self.paths['null'].append({'orig': items['path']})
@@ -124,8 +132,8 @@ class Migration(fmutils.FileManager):
 
         self.update("Gathering file info from DB")
         self.gather_data()
-        if self.pfwid is not None:
-            print("RAG test: PFWID = {:}".format(self.pfwid))
+        #if self.pfwid is not None:
+        #    print("RAG test: PFWID = {:}".format(self.pfwid))
         if not self.relpath:
             self.update(f'  Connot do migration for pfw_attempt_id, no relpath found {self.pfwid}', True)
             return 1
@@ -135,7 +143,7 @@ class Migration(fmutils.FileManager):
         else:
             newpath = os.path.join(self.destination, self.relpath)
         if newpath == self.relpath:
-            self.update(f"  ERROR: new path is the same as the original {newpath} == {self.relpath}", True)
+            #self.update(f"  ERROR: new path is the same as the original {newpath} == {self.relpath}", True)
             return 1
         newarchpath = os.path.join(self.archive_root, newpath)
         self.currnewpath = newpath
@@ -143,27 +151,34 @@ class Migration(fmutils.FileManager):
         self.get_files_from_db()
         self.count = len(self.files_from_db)
 
+        pathpart = newpath.split(os.sep)
         # make the root directory
         path = Path(newarchpath)
 #        print('path: ',path)
 #        print('newpath: ',newpath)
 #        path.mkdir(parents=True, exist_ok=True)
         if self.dryrun:
-            self.update(f"Make dir {path}")
+            self.update(f"Make dir mkdir.sh {path} from {os.getcwd()}")
         else:
             try:
-                sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/mkdir.sh", path])
+                sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/mkdir.sh", os.path.join(self.archive_root, pathpart[0], pathpart[1])] + pathpart[2:])
+                tcount = 0
                 while sub_fd.poll() is None:
-                    sub_fd.wait(0.1)
+                    try:
+                        sub_fd.wait(.1)
+                    except subprocess.TimeoutExpired:
+                        tcount += 1
+                        if tcount > 100:
+                            raise
                 ret_fd = sub_fd.poll()
                 if ret_fd != 0:
                     print("mkdir failed for path {:}".format(path))
-            #                print("mkdir failed for path {:s}".format(path))
-            #               raise
+                    #                print("mkdir failed for path {:s}".format(path))
+                    raise Exception("mkdir failed for path {:}".format(path))
             except:
                 print("Failed to mkdir for path: {:}".format(path))
-            #            print("Failed to mkdir for path: {:s}".format(path))
-            #            raise
+                #            print("Failed to mkdir for path: {:s}".format(path))
+                raise
 
         if not self.check_permissions(self.files_from_db):
             return 0
@@ -175,33 +190,6 @@ class Migration(fmutils.FileManager):
             size_sum += v['filesize']
         if self.check_status():
             return 1
-
-#       RAG added here (once data are in place) to chown the directory path to give it proper ownership....
-#       note am skipping the top and bottom levels 
-#       - top is likely an existing link
-#       - bottom gets chowned by migrate...
-        if self.chown:
-            if self.dryrun:
-                self.update(f"Chown {newpath}")
-            else:
-                try:
-                    psycho_path = newpath.split("/")
-                    print("psycho_path: {:}".format(psycho_path))
-                    # fix_dir=self.archive_root
-                    fix_dir = os.path.join(self.archive_root, psycho_path[0])
-                    for sdir_part in psycho_path[1:-1]:
-                        fix_dir = os.path.join(fix_dir, sdir_part)
-                        print("fix_dir: ", fix_dir)
-                        sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown_dir.sh", fix_dir])
-                        while sub_fd.poll() is None:
-                            sub_fd.wait(1)
-                        ret_fd = sub_fd.poll()
-                        if ret_fd != 0:
-                            print("chown failed for path {:}".format(fix_dir))
-                        # print("chown failed for path {:s}".format(fix_dir))
-                except:
-                    print("Failed to chown subdirectory level: {:}".format(fix_dir))
-                    # print("Failed to chown subdirectory level: {:s}".format(fix_dir))
 
         self.update("Updating database...")
         try:
@@ -239,20 +227,23 @@ class Migration(fmutils.FileManager):
                         if retc != 0:
                             self.update(f"chown failed for {newpath}, you may need to run it manually.")
 
-        except:
+        except Exception as ex:
             self.update("Error updating the database entries, rolling back any DB changes.", True)
             time.sleep(2)
-            self.rollback()
-            raise
+            try:
+                self.rollback()
+            except:
+                pass
+            raise ex
         # get new file info from db
         if self.check_status():
             return 0
+        
         oldpath = self.relpath
         self.relpath = newpath
         self.update(f"Running comparison of new files and database for {self.relpath}...")
         self.get_files_from_db()
         self.get_files_from_disk()
-
         if self.dryrun:
             return 0
         self.compare_db_disk()
@@ -273,11 +264,53 @@ class Migration(fmutils.FileManager):
             error = True
             self.update(f"Error {len(self.comparison_info['md5sum']):d} files have mismatched md5sums", True)
         if error:
-            self.rollback()
+            try:
+                self.rollback()
+            except:
+                pass
             return 1
+        self.update("     Complete, all files match")
+
+#       RAG added here (once data are in place) to chown the directory path to give it proper ownership....
+#       note am skipping the top and bottom levels 
+#       - top is likely an existing link
+#       - bottom gets chowned by migrate...
+        if self.chown:
+            if self.dryrun:
+                self.update(f"Chown {newpath}")
+            else:
+                try:
+                    psycho_path = newpath.split("/")
+                    #self.update("psycho_path: {:}".format(psycho_path))
+                    # fix_dir=self.archive_root
+                    fix_dir = os.path.join(self.archive_root, psycho_path[0])
+                    for sdir_part in psycho_path[1:-1]:
+                        fix_dir = os.path.join(fix_dir, sdir_part)
+                        #self.update(f"fix_dir: {fix_dir}")
+                        sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown_dir.sh", fix_dir])
+                        while sub_fd.poll() is None:
+                            sub_fd.wait(4)
+                        ret_fd = sub_fd.poll()
+                        if ret_fd != 0:
+                            self.update("chown failed for path {:}".format(fix_dir))
+                        else:
+                            self.update("chown succeeded for path {:s}".format(fix_dir))
+                    if self.raw:
+                        fix_dir = os.path.join(fix_dir, psycho_path[-1])
+                        #self.update(f"fix_dir: {fix_dir}")
+                        sub_fd = subprocess.Popen(['sudo', f"{os.environ['FILEMGMT_DIR']}/bin/chown.sh", fix_dir])
+                        while sub_fd.poll() is None:
+                            sub_fd.wait(1)
+                        ret_fd = sub_fd.poll()
+                        if ret_fd != 0:
+                            self.update("chown failed for path {:}".format(fix_dir))
+
+                except:
+                    self.update("Failed to chown subdirectory level: {:}".format(fix_dir))
+                    # print("Failed to chown subdirectory level: {:s}".format(fix_dir))
+
 
         # remove old files
-        self.update("     Complete, all files match")
         rml = []
         for i, item in enumerate(self.results['comp']):
             fname = item['fn'] + item['comp']
@@ -309,12 +342,13 @@ class Migration(fmutils.FileManager):
                 for f in cannot_del:
                     fh.write(f"    {f}\n")
             self.update(f"Cannot delete some files. See {self.pfwid}.undel for a list.", True)
+        
         end = time.time()
         curs = self.dbh.cursor()
         typ = 'production'
         if self.raw:
             typ = 'raw'
-        sql = f"insert into friedel_decade.data_migration (filetype, num_files, total_size, time) values ('{typ}', {self.count}, {size_sum}, {end-start})"
+        sql = f"insert into friedel.data_migration (filetype, num_files, total_size, time) values ('{typ}', {self.count}, {size_sum}, {end-start})"
         curs.execute(sql)
         curs.execute('commit')
 

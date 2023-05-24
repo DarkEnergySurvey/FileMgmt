@@ -6,6 +6,8 @@
 
 import sys
 import argparse
+import multiprocessing as mp
+
 import filemgmt.compare_utils as compare
 from filemgmt import fmutils
 
@@ -80,8 +82,14 @@ def main():
         stdp = compare.Print(args.log)
         sys.stdout = stdp
     (args, pfwids) = fmutils.determine_ids(args)
-    comp = compare.FileCompare(args, pfwids)
-    ret = compare.run()
+    manager = mp.Manager()
+    event = manager.Event()
+
+    def interrupt(x, y):
+        event.set()
+
+    comp = compare.FileCompare(args, pfwids, event)
+    ret = comp.run()
     if args.log is not None:
         sys.stdout.flush()
         sys.stdout = stdp.close()

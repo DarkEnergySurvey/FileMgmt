@@ -309,12 +309,14 @@ def run(inputs):
     """
     try:
         if len(inputs) == 6:
-            (action, wn, args, pfwids, event, que) = inputs
+            (action, wn, args, pfwids, event, [], que) = inputs
             runner = action(wn, args, pfwids, event, que)
         else:
             (action, wn, args, pfwids, event, rdirs, que) = inputs
             runner = action(wn, args, pfwids, event, rdirs, que)
         return runner.run()
+    except Exception as ex:
+        que.put_nowait(Message(wn, str(ex), 0))
     finally:
         que.put_nowait(Message(wn, COMPLETE, 0))
 
@@ -464,8 +466,6 @@ class FileManager:
         self.comparison_info = {}
 
     def reset(self):
-        self.dbh.close()
-        self.dbh = desdmdbi.DesDmDbi(self.des_services, self.section)
         self.relpath = None
         self.reqnum = None
         self.unitname = None
@@ -476,6 +476,12 @@ class FileManager:
         self.duplicates = None
         self.comparison_info = {}
         self._reset()
+        try:
+            self.dbh.close()
+        except:
+            pass
+        self.dbh = desdmdbi.DesDmDbi(self.des_services, self.section)
+
 
     def _reset(self):
         pass
@@ -498,7 +504,7 @@ class FileManager:
             return self.multi_task()
         except Exception as ex:
             if self.pfwid is not None:
-                efname = f"{self.pfwid}.err"
+                efname = f"{self.pfwid}-e.err"
             else:
                 efname = f"{os.path.basename(self.rdir)}.err"
             with open(efname, 'w') as fh:
@@ -596,7 +602,7 @@ class FileManager:
             if self.pfwid is not None:
                 fname = f"{self.pfwid}.badperm"
             else:
-                fname = f"{os.path.basename(self.rdir)}.badperm"
+                fname = f"run.badperm"
             with open(os.path.join(self.cwd, fname), 'w', encoding="utf-8") as fh:
                 for f in bad_files:
                     fh.write(f"{f}\n")
@@ -622,14 +628,21 @@ class FileManager:
         if self.pfwids:
             self.length = len(self.pfwids)
             for i, pdwi in enumerate(self.pfwids):
-                self.number = i
-                if self.check_status():
-                    return 0
-                self.count = 0
+                try:
+                    self.number = i
+                    if self.check_status():
+                        return 0
+                    self.count = 0
 
-                self.pfwid = pdwi
-                retval += self.do_task()
-                self.reset()
+                    self.pfwid = pdwi
+                    retval += self.do_task()
+                    self.reset()
+                except Exception as ex:
+                    retval += 1
+                    with open(os.path.join(self.cwd, f"{pdwi}.err"), 'w', encoding="utf-8") as fh:
+                        fh.write(f"Error with {pdwi}:  {ex}")
+                    self.reset()
+
         if self.dirs:
             self.length = len(self.dirs)
             for i, rd in enumerate(self.dirs):
@@ -641,7 +654,6 @@ class FileManager:
                 self.rdir = rd
                 retval += self.do_task()
                 self.reset()
-
         return retval
 
     def get_paths_by_path(self):
@@ -649,7 +661,6 @@ class FileManager:
         """
         # check archive is valid archive name (and get archive root)
         sql = f"select root from ops_archive where name={self.dbh.get_named_bind_string('name')}"
-
         curs = self.dbh.cursor()
         curs.execute(sql, {'name': self.archive})
         rows = curs.fetchall()
@@ -658,7 +669,6 @@ class FileManager:
             print(f"Invalid archive name ({self.archive}).   Found {cnt} rows in ops_archive")
             print("\tAborting")
             sys.exit(1)
-
         self.archive_root = rows[0][0]
         if self.rdir:
             self.archive_path = os.path.join(self.archive_root, self.rdir)
@@ -795,17 +805,21 @@ class FileManager:
 
         if self.debug:
             print(f"\nsql = {sql}\n")
-
         curs = self.dbh.cursor()
+        
         curs.execute(sql)
+        
         if self.debug:
             print("executed")
         desc = [d[0].lower() for d in curs.description]
-
+        
         filelist = []
 
         self.files_from_db = {}
+        count = 1
         for row in curs:
+            #print(f"ROW {count}")
+            count += 1
             fdict = dict(zip(desc, row))
             fname = fdict['filename']
             if fdict['compression'] is not None:
